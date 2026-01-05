@@ -16,7 +16,8 @@ Background in Rstudio, Python, Power BI, Power Query, Excel, and SAP data extrac
 ### 🔹 Python & ETL
 - **ETL Pipeline – ERP to Data Repository**  
   Simulated end-to-end ETL process replicating data extraction from an ERP system, transformation using Python, and loading into structured datasets for reporting.
-
+  - Repository: https://github.com/Gerardo-cc-m/etl-erp-python
+  
 - **Automated Commercial Reporting**  
   Python-based automation for generating and distributing reports via e-mail.
 
