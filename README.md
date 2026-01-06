@@ -27,7 +27,7 @@ Background in Rstudio, Python, Power BI, Power Query, Excel, and SAP data extrac
 ### 🔹 Power BI Dashboards
 - **Commercial Performance Dashboard**  
   Interactive dashboard to monitor commercial KPIs.
-- Repository: https://github.com/Gerardo-cc-m/powerbi/commercial-performance-dashboard
+  - Repository: [https://github.com/Gerardo-cc-m/Portfolio_GerardoCasasCordero/powerbi/commercial-performance-dashboard](https://github.com/Gerardo-cc-m/Portfolio_GerardoCasasCordero/tree/main/powerbi/commercial-performance-dashboard)
   
 - **Inventory & Aging Analysis**  
   Dashboard focused on inventory health, aging metrics, and performance indicators.
