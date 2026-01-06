@@ -26,7 +26,7 @@ The data was produced as the output of a Python-based ETL process
 
 ## Preview
 
-![Commercial](screenshots/comercial.png)
-![Car Sales](screenshots/ventas.png)
+![Model View](screenshots/modelo.png)  
+![Commercial](screenshots/comercial.png)  
 ![Key Performance Indicators](screenshots/kpis.png)
 
