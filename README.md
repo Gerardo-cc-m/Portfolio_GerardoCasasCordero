@@ -16,6 +16,7 @@ Background in Rstudio, Python, Power BI, Power Query, Excel, and SAP data extrac
 ### 🔹 Python & ETL
 - **ETL Pipeline – ERP to Data Repository**  
   Simulated end-to-end ETL process replicating data extraction from an ERP system, transformation using Python, and loading into structured datasets for reporting.
+  
   - Repository: https://github.com/Gerardo-cc-m/etl-erp-python
   
 - **Automated Commercial Reporting**  
@@ -25,10 +26,13 @@ Background in Rstudio, Python, Power BI, Power Query, Excel, and SAP data extrac
 
 - **Automated Educational Reporting**  
   Rstudio-bases automation for generating reports with educational insights and territorial caractheristics.
+  
+  - Repository: https://github.com/Gerardo-cc-m/Portfolio_GerardoCasasCordero/tree/main/Rstudio/automated-educational-reporting
 
 ### 🔹 Power BI Dashboards
 - **Commercial Performance Dashboard**  
   Interactive dashboard to monitor commercial KPIs.
+  
   - Repository: [https://github.com/Gerardo-cc-m/Portfolio_GerardoCasasCordero/powerbi/commercial-performance-dashboard](https://github.com/Gerardo-cc-m/Portfolio_GerardoCasasCordero/tree/main/powerbi/commercial-performance-dashboard)  
 
 ### 🔹 Excel & VBA
