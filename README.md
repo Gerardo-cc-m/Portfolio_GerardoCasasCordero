@@ -21,16 +21,15 @@ Background in Rstudio, Python, Power BI, Power Query, Excel, and SAP data extrac
 - **Automated Commercial Reporting**  
   Python-based automation for generating and distributing reports via e-mail.
 
+### 🔹 Rstudio automation  
+
 - **Automated Educational Reporting**  
-  Rstudio-bases automation for generating reports with educational insights and terriotrial caractheristics.
+  Rstudio-bases automation for generating reports with educational insights and territorial caractheristics.
 
 ### 🔹 Power BI Dashboards
 - **Commercial Performance Dashboard**  
   Interactive dashboard to monitor commercial KPIs.
-  - Repository: [https://github.com/Gerardo-cc-m/Portfolio_GerardoCasasCordero/powerbi/commercial-performance-dashboard](https://github.com/Gerardo-cc-m/Portfolio_GerardoCasasCordero/tree/main/powerbi/commercial-performance-dashboard)
-  
-- **Inventory & Aging Analysis**  
-  Dashboard focused on inventory health, aging metrics, and performance indicators.
+  - Repository: [https://github.com/Gerardo-cc-m/Portfolio_GerardoCasasCordero/powerbi/commercial-performance-dashboard](https://github.com/Gerardo-cc-m/Portfolio_GerardoCasasCordero/tree/main/powerbi/commercial-performance-dashboard)  
 
 ### 🔹 Excel & VBA
 - **KPI Tracker & Management Dashboard**  
