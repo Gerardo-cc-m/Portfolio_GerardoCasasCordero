@@ -1,0 +1,2073 @@
+---
+title: |
+  ![](D:/OneDrive - Dirección de Educación Pública/DEP/Logo DEP/NuevoLogoDEP.png){width=25% height=25%}
+  
+  DOCUMENTO RESUMEN
+  
+  ______________________________________
+  
+  Caracterización Territorial 
+  
+  Servicios Locales de Educación Pública
+  
+  ______________________________________
+  
+  `r  nombre_SLEP[i]`
+
+author: "Gerardo Casas-Cordero"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+always_allow_html: true
+output:
+  pdf_document: default
+  bookdown::html_document2:
+    toc: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+```{r librerias, include=FALSE}
+
+library(tidyverse)
+library(openxlsx)
+library(readxl)
+library(janitor)
+library(knitr) #para imprimir tablas
+library(kableExtra)
+library(ggplot2)
+library(sf)
+library(ggspatial)
+library(gridExtra)
+library(tinytex) # exportar a pdf
+```
+
+\newpage
+
+# Caracterización General del territorio del Servicio Local de Educación Pública `r nombre_SLEP[i]`
+
+```{r datos generales SLEP, include=FALSE}
+
+#------------------------------------------------------------------------------#
+# Anio base directorio
+anioD = 2021
+# Anio base matricula
+anioM = 2021
+#ruta directorio Establecimientos
+ruta_d <- "D:/OneDrive - Dirección de Educación Pública/DEP/Basedatos/Directorio/EE"
+# ruta directorio Comunas
+ruta_c <- "D:/OneDrive - Dirección de Educación Pública/DEP/Basedatos"
+# ruta directorio Jardines Infantiles
+ruta_j <- "D:/OneDrive - Dirección de Educación Pública/DEP/Basedatos/Directorio/Jardines Infantiles"
+# ruta matricula por establecimiento
+ruta_m <- "D:/OneDrive - Dirección de Educación Pública/DEP/Basedatos/Matricula/ee"
+
+# Abrir directorio de establecimientos
+DG_EE <- read_delim(paste(ruta_d,"/directorio_oficial_EE_",anioD,"_Oficial.csv",sep = ""),delim=";")
+# Abrir directorio de SLEP
+DG_COMUNA <- read_excel(paste(ruta_c,"Comunas SLEP_70.xlsx",sep = "/"),sheet = "SLEP_70 ñuble")
+# Abrir directorio Jardines Infantiles
+DG_JI <-read_excel(paste(ruta_j,"JI_70SLEP.xlsx",sep = "/"))
+# Abrir archivo matricula por EE
+DG_MAT <- read_delim(paste(ruta_m,"/Resumen_Matrcula_EE_",anioM,"_oficial.csv",sep = ""),delim = ";")
+#------------------------------------------------------------------------------#
+
+# Directorio de EE - Crear variable SLEP
+DG_EE <- DG_EE %>% mutate(SLEP=cod_SLEP(COD_COM_RBD)) %>%
+  # Filtrar por SLEP, establecimiento funcionando con matricula
+  filter(SLEP == nombre_SLEP[i], ESTADO_ESTAB==1, MATRICULA==1)
+
+# Directorio comunas SLEP
+DG_COMUNA <- DG_COMUNA %>%
+  # Borrar variable SLEP original del directorio, Crear nueva variable SLEP y filtrar 
+  select(-c(SLEP)) %>% mutate(SLEP = cod_SLEP(cod_com)) %>% filter(SLEP == nombre_SLEP[i])
+
+# directorio JI - Borrar variable SLEP original del directorio
+DG_JI <- DG_JI %>% select(-c(SLEP)) %>% 
+  # Crear nueva variable SLEP y filtrar
+  mutate(SLEP=cod_SLEP(cod_com)) %>% filter(SLEP == nombre_SLEP[i])
+
+# Matricula por EE - Crear variable SLEP
+DG_MAT <- DG_MAT %>% mutate(SLEP=cod_SLEP(COD_COM_RBD)) %>%
+  # Filtrar por SLEP y establecimiento funcionando
+  filter(SLEP == nombre_SLEP[i],ESTADO_ESTAB==1)
+
+# directorio SLEP - Comunas del SLEP
+COM_SLEP <- distinct(DG_EE, NOM_COM = DG_EE$NOM_COM_RBD, COD_COM = DG_EE$COD_COM_RBD)
+
+# Lista con nombres de las comunas
+lista_NOM_COM <- as.list(COM_SLEP[[1]])
+
+# Region del SLEP
+NOM_REGION <- distinct(DG_EE,NOM_REG = NOM_REG_RBD_A,COD_REG = COD_REG_RBD)
+
+# Entrada en funcionamiento
+anio_ENTRADA <- distinct(DG_COMUNA, DG_COMUNA$`slep anio`)
+# Traspaso sostenedor
+anio_TRASPASO <- anio_ENTRADA + 1
+
+# Numero de Establecimientos publicos del SLEP
+n_EE_publico <- DG_EE %>% filter(COD_DEPE2 %in% c(1,5)) %>% group_by(SLEP) %>% 
+  summarize(n_EE = n(), n_EE_rural=sum(RURAL_RBD == 1))
+
+# Numero total de establecimientos del territorio
+n_EE_total <- DG_EE %>% group_by(SLEP) %>% 
+  summarize(n_EE = n(), n_EE_rural=sum(RURAL_RBD == 1))
+
+# Total de EE por tipo de dependencia
+n_EE_PUB <- sum(DG_EE$ESTADO_ESTAB[DG_EE$COD_DEPE2 %in% c(1,5)])
+n_EE_SUV <- sum(DG_EE$ESTADO_ESTAB[DG_EE$COD_DEPE2 == 2])
+n_EE_PRI <- sum(DG_EE$ESTADO_ESTAB[DG_EE$COD_DEPE2 == 3])
+n_EE_ADM <- sum(DG_EE$ESTADO_ESTAB[DG_EE$COD_DEPE2 == 4])
+
+# Numero de Jardines infantiles del SLEP
+n_JI <- nrow(DG_JI)
+
+# Numero de comunas del SLEP
+n_COMUNAS <- length(lista_NOM_COM)
+
+# Nombre de comuna cabecera del SLEP
+NOM_COM_CAB <- distinct(DG_COMUNA,NOM_CAB = DG_COMUNA$capital_slep)
+
+# numero matricula publica del SLEP
+n_MAT_SLEP <- DG_MAT %>% filter(COD_DEPE2 %in% c(1,5)) %>% 
+  group_by(SLEP) %>%
+  summarise(matricula = sum(MAT_TOTAL,na.rm = T),
+            matricula_rural = sum(MAT_TOTAL[RURAL_RBD == 1], na.rm = T))
+
+# Numero matricula total del SLEP
+n_MAT_TOTAL <- DG_MAT %>%  group_by(SLEP) %>% 
+  summarize(matricula = sum (MAT_TOTAL,na.rm = T),
+            matricula_rural = sum(MAT_TOTAL[RURAL_RBD == 1], na.rm = T))
+
+# numero matricula publica por comuna
+n_MAT_COM <- DG_MAT %>% filter(COD_DEPE2 %in% c(1,5)) %>%
+  group_by(COD_COM_RBD,NOM_COM_RBD) %>% 
+  summarise(matricula = sum(MAT_TOTAL,na.rm = T))
+
+# numero matricula por dependencia
+n_MAT_PUB <- sum(DG_MAT$MAT_TOTAL[DG_MAT$COD_DEPE2 %in% c(1,5)])
+n_MAT_SUV <- sum(DG_MAT$MAT_TOTAL[DG_MAT$COD_DEPE2 == 2])
+n_MAT_PRI <- sum(DG_MAT$MAT_TOTAL[DG_MAT$COD_DEPE2 == 3])
+n_MAT_ADM <- sum(DG_MAT$MAT_TOTAL[DG_MAT$COD_DEPE2 == 4])
+
+rm(DG_COMUNA,DG_EE,DG_JI,DG_MAT,ruta_c,ruta_j)
+```
+
+## Resumen de antecedentes generales del territorio
+
+De conformidad a la Ley N° 21.040 que crea el sistema de Educación Pública, el Servicio Local de Educación Pública `r nombre_SLEP[i]` (en adelante, SLEP o Servicio Local), con futuro domicilio en la comuna de **`r NOM_COM_CAB`**, asumirá la responsabilidad de encargarse de la administración y gestión de **`r n_EE_publico[[2]]` Establecimientos Educacionales** (en adelante, EE) y **`r n_JI` Jardines Infantiles** (en adelante, JI) que componen `r n_COMUNAS` comunas de la Región `r NOM_REGION`, las cuales se detallan en la siguiente tabla:
+
+```{r Antecedentes Generales 1, include=FALSE}
+# Crear tabla de antecedentes generales
+Antecedentes_generales <- data.frame(Var1 = c("Nombre del SLEP",
+                                              "Región",
+                                              "Año proyectado de entrada en funcionamiento",
+                                              "Año proyectado traspaso de sostenedor",
+                                              "Comunas del SLEP"),
+                                     Var2 = c(nombre_SLEP[i],
+                                              NOM_REGION[[1]],
+                                              anio_ENTRADA[[1]],
+                                              anio_TRASPASO[[1]],
+                                              paste(lista_NOM_COM,collapse = ", ")))
+```
+
+```{r}
+x <- kable(Antecedentes_generales,booktabs=T,row.names = FALSE,
+           caption = "Antecedentes generales del territorio",
+           align = c("l",rep("c",ncol(Antecedentes_generales)-1))) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(1,color = "white",background = "#3333FF") %>%
+  column_spec(1,color = "white",background = "#3333FF")
+
+# Crear tabla sin encabezado
+gsub("<thead>.*</thead>", "", x)
+```
+
+```{r Poblacion, include=FALSE}
+
+#------------------------------------------------------------------------------#
+# Poblacion del año
+anioP = 2021
+# ruta estimacion poblacion
+ruta <- "D:/OneDrive - Dirección de Educación Pública/DEP/Basedatos/INE"
+# Abrir archivo estimacion y proyeccion poblacion
+POBLACION <- read_excel(paste(ruta,"/estimaciones-y-proyecciones-2002-2035-comunas.xlsx",sep = ""))
+
+#------------------------------------------------------------------------------#
+
+# Remodelar base
+POBLACION <- gather(data = POBLACION,key="agno",value="Poblacion",`Poblacion 2002`:`Poblacion 2035`)
+# Quitar valor "Poblacion" a los registros de la columna agno y transformar a numerica
+POBLACION$agno <- as.numeric(gsub("[A-z]","",POBLACION$agno))
+
+# Poblacion de la Region del SLEP
+POB_REGION <- POBLACION %>% filter(Region==NOM_REGION[[2]]) %>% group_by(Region) %>%
+  summarise(Poblacion_total = sum(Poblacion[agno==anioP]),
+            Poblacion_escolar = sum(Poblacion[agno==anioP & (Edad>=6 & Edad<=18)]))
+
+# Crear variable SLEP
+POBLACION <- POBLACION %>% mutate(SLEP= cod_SLEP(Comuna)) %>%
+  # Filtrar por SLEP
+  filter(SLEP == nombre_SLEP[i])
+
+# Poblacion anio actual - filtrar por SLEP
+POB_ACTUAL_SLEP <- POBLACION %>% group_by(SLEP) %>%
+  # Resumir variable poblacion total y escolar
+  summarise(Poblacion_total = sum(Poblacion[agno==anioP]),
+            Poblacion_escolar = sum(Poblacion[agno==anioP & (Edad>=6 & Edad<=18)]))
+
+# Poblacion actual por comuna
+POB_ACTUAL_COM <- POBLACION %>% group_by(Comuna) %>%
+  summarise(`Poblacion de 0-3 años` = sum(Poblacion[agno==anioP & Edad>=0 & Edad<=3]),
+            `Poblacion de 4-5 años` = sum(Poblacion[agno==anioP & Edad>=4 & Edad<=5]),
+            `Poblacion de 6-13 años` = sum(Poblacion[agno==anioP & Edad>=6 & Edad<=13]),
+            `Poblacion de 14-18 años` = sum(Poblacion[agno==anioP & Edad>=14 & Edad<=18]),
+            `Poblacion de 0-18 años` = sum(Poblacion[agno==anioP & Edad>=0 & Edad<=18]))
+
+anio_p = anioP - 5
+anio_f = anioP + 5
+# Proyeccion poblacion escolar del SLEP
+PROY_POB_SLEP <- POBLACION %>% group_by(SLEP,agno) %>%
+  # Resumir variable poblacion total y escolar
+  summarise(Poblacion_escolar = sum(Poblacion[Edad>=6 & Edad<=18])) %>%
+  # Filtrar por anios a considerar
+  filter(agno>=anio_p & agno<=anio_f)
+
+# Proyeccion poblacion escolar por comuna
+PROY_POB_COM <- POBLACION %>% group_by(Comuna,agno) %>%
+  # Resumir variable poblacion total y escolar
+  summarise(Poblacion_escolar = sum(Poblacion[Edad>=6 & Edad<=18])) %>%
+  # Filtrar por anios a considerar
+  filter(agno>=anio_p & agno<=anio_f)
+
+rm(x,anio_p,anio_f,ruta,POBLACION)
+```
+
+```{r Antecedente Generales 2, include=FALSE}
+# Crear tabla de antecedentes generales
+Antecedentes_generales_2 <- data.frame(Var1 = c("Nombre del SLEP",
+                                                paste("Población Total",anioP,sep = " "),
+                                                paste("Población Edad Escolar",anioP,sep = " "),
+                                                paste("Matrícula Municipal",anioM,sep = " "),
+                                                paste("EE Municipales",anioM,sep = " "),
+                                                "JI VTF Municipal"),
+                                     Var2 = c(nombre_SLEP[i],
+                                              format(as.numeric(POB_ACTUAL_SLEP$Poblacion_total),big.mark = "."),
+                                              format(POB_ACTUAL_SLEP$Poblacion_escolar,big.mark = "."),
+                                              format(n_MAT_SLEP$matricula,big.mark = "."),
+                                              n_EE_publico[[2]],
+                                              n_JI[[1]]))
+```
+
+```{r}
+  x<- kable(Antecedentes_generales_2,booktabs=T,row.names = FALSE,
+        caption = "Antecedentes generales del territorio",
+        align = c("l",rep("c",ncol(Antecedentes_generales_2)-1))) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(1,color = "white",background = "#3333FF") %>%
+  column_spec(1,color = "white",background = "#3333FF") %>%
+  add_footnote("Fuente: Unidad de Estadísticas, Centro de Estudios, División de Planificación y Presupuesto, Ministerio de Educación.",notation = "none") %>%
+  add_footnote(paste("Base utilizada: Matrícula Oficial ",anioM," y Directorio de EE Oficial.",sep = ""),"none")
+
+# Crear tabla sin encabezado
+gsub("<thead>.*</thead>", "", x)
+
+```
+**Nota:**
+
+  * Se consideran establecimientos en funcionamiento y con matrícula asociada.
+
+  * VTF: Vía Transferencia de Fondos.
+
+  * Población en edad escolar: niños entre 6 y 18 años.
+
+## Mapa del Territorio del SLEP `r nombre_SLEP[i]` y comunas que lo componen
+
+```{r mapa territorial, include=FALSE}
+#-------------------------------------------------------------------------------#
+# Ruta donde se encuentra el archivo
+ruta <- "D:/OneDrive - Dirección de Educación Pública/DEP/Basedatos/mapas comunas"
+
+#------------------------------------------------------------------------------#
+
+# Abre archivo con comunas
+mapa_COM <- st_read(paste(ruta,"comunas.shp",sep = "/"))
+# Filtrar base, sacando las comunas de Rapanui y Juan Fernandez
+mapa_COM <- mapa_COM %>% filter(!cod_comuna %in% c(5104,5201))
+
+# Crear filtro de mapa por region
+mapa_REG <-mapa_COM %>% subset(codregion %in% NOM_REGION[[2]])
+# Crear filtro de mapa por SLEP
+mapa_Slep <- mapa_REG %>% subset(cod_comuna %in% COM_SLEP[[2]])
+
+# Crear mapa de Region
+mapa_REG <- ggplot(data = mapa_REG)+
+  geom_sf(fill="azure1",color="black")+
+  annotation_north_arrow(location="tr")+
+  annotation_scale()+
+  geom_sf(data=mapa_Slep,fill="chocolate1",color="black")+
+  labs(caption = mapa_REG$Region)
+# Crear mapa de Region
+mapa_Slep <- ggplot(data = mapa_Slep)+
+  geom_sf(fill="tan1",color="black")+
+  annotation_scale()+
+  geom_sf_label(aes(label=Comuna))+
+  labs(caption=paste("Servicio Local de Educación Pública",nombre_SLEP[i],sep = " "))
+
+rm(mapa_COM,ruta,x)
+```
+
+```{r, fig.cap= "Mapa Región del SLEP", fig.align='center'}
+mapa_REG
+```
+
+```{r, fig.cap= "Mapa de las comunas que componen el SLEP", fig.align='center'}
+mapa_Slep
+```
+
+## Autoridades del Territorio
+
+```{r}
+
+```
+
+## Vulnerabilidad en el Territorio
+
+El Índice de Vulnerabilidad Escolar (IVE) se obtiene a partir de los registros del Sistema Nacional de Asignación con Equidad (SINAE), el cual consiste en la evaluación de un conjunto de criterios que permiten identificar distintos grupos dentro de la población de estudiantes de la educación básica y media de acuerdo con el nivel de vulnerabilidad que presentan.
+
+Por lo tanto, se entiende como **alumnos vulnerables**, aquellos que se encuentran clasificados en uno de los 3 niveles de prioridad de atención de necesidades establecidas por el SINAE.
+
+```{r IVE, include=FALSE}
+#------------------------------------------------------------------------------#
+# Anio de la base
+anioIVE = 2021
+# Seleccionar directorio
+ruta <- "D:/OneDrive - Dirección de Educación Pública/DEP/Basedatos/IVE"
+# Nombre del archivo
+IVE <-read_excel(paste(ruta,"/IVE-",anioIVE,".xlsx",sep = ""),sheet = "COMUNA")
+
+#------------------------------------------------------------------------------#
+
+IVE <- IVE %>%
+  # Crear variable SLEP
+  mutate(SLEP=cod_SLEP(ID_COMUNA_ESTABLE),
+         # Crear variable Estudiantes vulnerables
+         `N° Estudiantes Vulnerables` =
+           rowSums(IVE[,c("PRIMERA PRIORIDAD","SEGUNDA PRIORIDAD","TERCERA PRIORIDAD")],na.rm=T),
+         # Dar formato a variable no vulnerables
+         `NO PRIORIZADO EN VULNERABILIDAD`=`NO PRIORIZADO EN VULNERABILIDAD`,
+         # dar formato a IVE
+         "IVE(%)" =round(IVE[[length(IVE)]] * 100,2)) %>%
+  # Renombrar variables
+  rename(`N° Estudiantes No Vulnerables` = "NO PRIORIZADO EN VULNERABILIDAD",
+         "S/I"="SIN INFORMACION",
+         Comuna = DS_COMUNA_ESTABLE) %>%
+  # Filtrar por SLEP
+  filter(SLEP == nombre_SLEP[i]) %>%
+  # Seleccionar variables de interes
+  select(Comuna,`N° Estudiantes Vulnerables`,`N° Estudiantes No Vulnerables`,"S/I","IVE(%)")
+```
+
+```{r}
+kable(IVE,booktabs=T,row.names = FALSE,
+      caption = paste("Índice de Vulnerabilidad Escolar (IVE) en el territorio, año",
+                      anioIVE,sep = " "),
+      align = c("l",rep("c",ncol(IVE)-1)),
+      format.args = list(big.mark=".")) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(0,color = "white",background = "#3333FF") %>%
+  add_footnote(paste("Fuente: IVE SINAE",anioIVE,sep = " "),notation = "none")
+```
+
+```{r IVE historico, include=FALSE}
+#------------------------ EDITAR ANIO DE ULTIMA BASE --------------------------#
+#Anio de primera y ultima base de dato
+anio_p = 2012
+anio_u = anioIVE
+# Seleccionar directorio
+ruta <- "D:/OneDrive - Dirección de Educación Pública/DEP/Basedatos/IVE"
+#------------------------------------------------------------------------------#
+
+# Auxiliares
+k= 1
+lista_ive <- c()
+
+while (anio_p <= anio_u) {
+
+   # Abrir archivo
+lista_ive[[k]] <-read_excel(paste(ruta,"/IVE-",anio_p,".xlsx",sep = ""),
+                            sheet = "COMUNA") %>%
+  rename_with(toupper)
+
+# Renombrar variables para homologar todas las bases
+try(names(lista_ive[[k]])[names(lista_ive[[k]]) == "ID_COMUNA_ESTABLE"] <- "ID_COM")
+try(names(lista_ive[[k]])[names(lista_ive[[k]]) %in% c("DES_COMUNA","DS_COMUNA_ESTABLE")] <- "COMUNA")
+# Renombrar variable de IVE para homologar todas las bases
+names(lista_ive[[k]])[length(names(lista_ive[[k]]))] <- "IVE"
+
+lista_ive[[k]] <- lista_ive[[k]] %>%
+  # Crear variable anio
+  mutate(AGNO = anio_p,
+         # Crear variable SLEP
+         SLEP=cod_SLEP(ID_COM),
+         # Transformar ID_COM a numerica
+         COD_COM = as.numeric(ID_COM),
+         # dar formato a IVE
+         IVE =if_else(AGNO != 2015,round(IVE * 100,2),
+                           round(IVE,2))) %>%
+  # Filtrar por SLEP
+  filter(SLEP == nombre_SLEP[i]) %>%
+  # Seleccionar variables de interes
+  select(AGNO,COD_COM,IVE)
+
+anio_p = anio_p + 1
+k= k + 1
+
+}
+
+# Crear dataframe de IVE historico
+IVE_HIST <- bind_rows(lista_ive)
+# Unir con base de comunas
+IVE_HIST <- left_join(IVE_HIST,COM_SLEP, by = "COD_COM") %>%
+  rename(Comuna = NOM_COM)
+
+rm(ruta,anio_p,anio_u,k,lista_ive)
+```
+
+```{r, fig.cap= "Índice de Vulnerabilidad (IVE) en las comunas pertenecientes al SLEP", fig.align='center'}
+
+ggplot(IVE_HIST, aes(x=AGNO,y=IVE,color = Comuna))+ geom_line() + geom_point() +
+  labs(x="Año",y="Ive (%)",caption = "Fuente: IVE-SINAE") +
+  scale_x_continuous(TRUE)
+
+```
+
+Vulnerabilidad en estudiantes pertenecientes a establecimientos de dependencia municipal:
+
+```{r IVE municipal, include=FALSE}
+#------------------------------------------------------------------------------#
+# Seleccionar directorio
+ruta <- "D:/OneDrive - Dirección de Educación Pública/DEP/Basedatos/IVE"
+# Nombre del archivo
+IVE_municipal <- paste(ruta,"/IVE-",anioIVE,".xlsx",sep = "")
+
+#------------------------------------------------------------------------------#
+
+# Nombre de las hojas del archivo
+nombre_hojas <- excel_sheets(IVE_municipal)
+# Abrir archivo
+lista_ive <- lapply(nombre_hojas, function(x) read_excel(IVE_municipal, sheet = x,skip = 3))
+# Poner nombre a la lista
+names(lista_ive) <- nombre_hojas
+# Eliminar hoja Comuna
+lista_ive[["COMUNA"]] <- NULL
+
+for (k in seq_along(lista_ive)){
+
+  # Renombrar variable de IVE
+  names(lista_ive[[k]])[length(names(lista_ive[[k]]))] <- "IVE"
+
+  lista_ive[[k]] <- lista_ive[[k]] %>%
+    #Renombrando variables
+    rename("No Vulnerables" = "NO PRIORIZADO EN VULNERABILIDAD",
+           "S/I" = "SIN INFORMACION",
+           Comuna = DS_COMUNA_ESTABLE) %>%
+    mutate(SLEP=cod_SLEP(ID_COMUNA_ESTABLE),
+           Vulnerables = rowSums(lista_ive[[k]][,c("PRIMERA PRIORIDAD","SEGUNDA PRIORIDAD","TERCERA PRIORIDAD")],na.rm=T)) %>%
+    #Filtrando por SLEP y Dependencia publica
+    filter(SLEP == nombre_SLEP[i],
+           DS_TIPO_DEPENDENCIA %in% c("Municipal DAEM","Corporación Municipal","Servicio Local de Educación(SLE)")) %>%
+    # Seleccionar variabls de interes
+    select(Comuna,Vulnerables,"No Vulnerables","S/I")
+}
+
+# Unir lista en una base
+IVE_municipal <- bind_rows(lista_ive)
+IVE_municipal <- IVE_municipal %>% group_by(Comuna) %>%
+  summarize(Vulnerables = sum(Vulnerables),
+            "No Vulnerables" = sum(`No Vulnerables`,na.rm = T),
+            "S/I" = sum(`S/I`,na.rm = T),
+            Total = Vulnerables + `No Vulnerables` + `S/I`,
+            "IVE(%)" = round((Vulnerables/Total)*100,2))
+
+rm(nombre_hojas,lista_ive,k)
+```
+
+```{r}
+kable(IVE_municipal,booktabs=T,row.names = FALSE,
+      caption = paste("Índice de Vulnerabilidad Escolar (IVE) en establecimientos municipales, año",
+                      anioIVE,sep = " "),
+      align = c("l",rep("c",ncol(IVE_municipal)-1)),
+      format.args = list(big.mark=".")) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(0,color = "white",background = "#3333FF") %>%
+  add_footnote(paste("Fuente: IVE SINAE",anioIVE,sep = " "),notation = "none")
+```
+
+### Estudiantes Prioritarios y Preferentes
+
+Con el objetivo de mejorar la calidad de la educación de los establecimientos educacionales subvencionados se crea la Ley N° 20.248 de Subvención Escolar Preferencial (en adelante, Ley SEP), que tiene por objetivo entregar recursos económicos a los establecimientos educacionales de acuerdo a la cantidad de **alumnos prioritarios y preferentes** matriculados, y que, además, cumplan con los requisitos, objetivos y requerimientos establecidos en la Ley SEP. Para estos efectos, se definen:
+
+  *	**Estudiantes Prioritarios:** Son aquellos quienes tienen una situación socioeconómica en sus hogares que le pueden dificultar su proceso educativo, según los criterios establecidos en el artículo 2° de Ley SEP.
+
+  *	**Estudiantes preferentes:** Son aquellos que **no** tienen calidad de alumno prioritario y cuyas familias pertenecen al 80% más vulnerable de la población. Según el instrumento de caracterización social vigente (Registro Social de Hogares).
+
+```{r SEP, include=FALSE}
+#------------------------------------------------------------------------------#
+#Anio de ultima base de dato
+anioSEP = 2020
+# Seleccionar directorio
+ruta <- "D:/OneDrive - Dirección de Educación Pública/DEP/Basedatos/SEP"
+
+#------------------------------------------------------------------------------#
+
+# Auxiliar
+anio_i = anioSEP - 4
+k = 1
+lista_SEP <- c()
+
+while (anio_i <= anioSEP){
+
+  # Abrir archivo
+  lista_SEP[[k]] <- read_delim(paste(ruta,"/Preferentes_Prioritarios_y_Beneficiarios_",anio_i,"_PUBL.csv",sep = ""),delim = ";") %>%
+    rename_with(toupper)
+
+  # Crear variable sLEP, anio y transforma codigo comuna a numerica
+  lista_SEP[[k]] <- lista_SEP[[k]] %>%
+    mutate(SLEP = cod_SLEP(COD_COM_RBD),
+           AGNO = anio_i,
+           COD_COM_RBD = as.numeric(COD_COM_RBD)) %>%
+    # Filtrar por SLEP y EE publicos
+    filter(SLEP == nombre_SLEP[[i]], COD_DEPE2 %in% c(1,5)) %>%
+    # Agrupar por anio, SLEP y comuna
+    group_by(AGNO,SLEP,COD_COM_RBD) %>%
+    # Resumir variables Preferentes, Prioritarios y Beneficiarios
+    summarize(Preferentes = sum(PREFERENTE_ALU,na.rm = T),
+              Prioritarios = sum(PRIORITARIO_ALU,na.rm = T),
+              Total = Preferentes + Prioritarios,
+              Beneficiarios = sum(BEN_SEP))
+
+  anio_i = anio_i + 1
+  k = k + 1
+}
+
+# Unir lista SEP y filtrar por anio actual
+SEP_ACTUAL <- bind_rows(lista_SEP) %>% filter(AGNO == anioSEP)
+# Unir SEP con base de numero matricula por comuna
+SEP_ACTUAL <- merge(SEP_ACTUAL,n_MAT_COM, by="COD_COM_RBD")
+
+SEP_ACTUAL <- SEP_ACTUAL %>%
+  # Crear variable % estudiantes vulnerables
+  mutate("Estudiantes Vulnerables(%)" = round(((Prioritarios + Preferentes) / matricula)*100,2)) %>%
+  # Seleccionar variables de interes
+  select(-c(COD_COM_RBD,matricula,AGNO,SLEP)) %>%
+  # Renombrar variable Comuna
+  rename(Comuna = NOM_COM_RBD) %>%
+  # Reubicar variable comuna al inicio
+  relocate(Comuna, .before = Preferentes)
+
+# Unir lista SEP
+SEP_HIST <- bind_rows(lista_SEP)
+# agrupar por anio
+SEP_HIST <- SEP_HIST %>% group_by(AGNO) %>%
+  # Resumir variables preferentes, prioritario, total y no beneficiario
+  summarise(Preferentes = sum(Preferentes),
+            Prioritarios = sum(Prioritarios),
+            Total = Preferentes + Prioritarios,
+            Beneficiarios = sum(Beneficiarios),
+            "No Beneficiarios" = Total - Beneficiarios) %>%
+  # Seleccionar variables de interes
+  select(-c(Beneficiarios,Total))
+
+rm(anio_i,k,lista_SEP,ruta)
+
+```
+
+```{r}
+kable(SEP_ACTUAL,booktabs=T,row.names = FALSE,
+      caption = paste("Estudiantes Prioritarios y Preferentes en EE públicos del territorio, año",
+                      anioSEP,sep = " "),
+      align = c("l",rep("c",ncol(SEP_ACTUAL)-1)),
+      format.args = list(big.mark=".")) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(0,color = "white",background = "#3333FF") %>%
+  add_footnote(paste("Fuente: Datos Abiertos Mineduc, Base SEP",anioSEP,sep = " "),notation = "none") %>%
+  add_footnote("Nota: Porcentaje de estudiantes vulnerables corresponde a la suma de los estudiantes prioritarios y preferentes sobre la matrícula municipal por comuna",notation = "none")
+```
+
+```{r, fig.cap= "Evolución del número de estudiantes preferentes, prioritarios y no beneficiarios", fig.align='center'}
+
+ggplot(gather(SEP_HIST,"Descripcion","N Estudiantes",-AGNO),
+       aes(x=AGNO,y=`N Estudiantes`,color = Descripcion)) +
+  geom_line() +
+  geom_point() +
+  labs(x="Año",y="N° Estudiantes",caption = "Fuente: Datos Abiertos Mineduc, Base SEP.") +
+  geom_text(aes(label = `N Estudiantes`),vjust = -0.5)
+
+```
+
+### Estudiantes PIE
+
+```{r PIE, include=FALSE}
+
+#------------------------------------------------------------------------------#
+# BASE DE MATRICULA DEBE VENIR CON CAMPO INT_ALU para obtener dato estudiantes PIE
+#Anio de ultima base de dato
+anioPIE = 2021
+# Seleccionar directorio
+ruta <- "D:/OneDrive - Dirección de Educación Pública/DEP/Basedatos/Matricula/mrun/bd_privadas"
+
+#------------------------------------------------------------------------------#
+
+# Auxiliar
+anio_i = anioPIE - 5
+k = 1
+lista_PIE <- c()
+
+while (anio_i <= anioPIE){
+
+  # Abrir archivo
+  lista_PIE[[k]] <- read_delim(paste(ruta,"/matricula_unica_",anio_i,"_PRIV.csv",sep = ""),delim = ";") %>%
+    rename_with(toupper)
+
+  # Crear variable sLEP, anio y transforma codigo comuna a numerica
+  lista_PIE[[k]] <- lista_PIE[[k]] %>%
+    mutate(SLEP = cod_SLEP(COD_COM_RBD),
+           AGNO = anio_i,
+           COD_COM_RBD = as.numeric(COD_COM_RBD)) %>%
+    # Filtrar por SLEP y EE publicos
+    filter(SLEP == nombre_SLEP[[i]], COD_DEPE2 %in% c(1,5)) %>%
+    # Agrupar por anio, SLEP y comuna
+    group_by(AGNO,SLEP,COD_COM_RBD) %>%
+    # Resumir variables alumno integrado
+    summarize(Beneficiarios = sum(INT_ALU))
+
+  anio_i = anio_i + 1
+  k = k + 1
+}
+
+# Unir lista SEP y filtrar por anio actual
+PIE_ACTUAL <- bind_rows(lista_PIE) %>% filter(AGNO == anioPIE)
+# Unir SEP con base de numero matricula por comuna
+PIE_ACTUAL <- merge(PIE_ACTUAL,n_MAT_COM, by="COD_COM_RBD")
+
+PIE_ACTUAL <- PIE_ACTUAL %>%
+  # Crear variable % estudiantes vulnerables
+  mutate("Beneficiarios(%)" = round((Beneficiarios / matricula)*100,2)) %>%
+  # Seleccionar variables de interes
+  select(NOM_COM_RBD,Beneficiarios,"Beneficiarios(%)") %>%
+  # Renombrar variable Comuna
+  rename(Comuna = NOM_COM_RBD)
+
+# Unir lista SEP
+PIE_HIST <- bind_rows(lista_PIE)
+# agrupar por anio
+PIE_HIST <- PIE_HIST %>% group_by(AGNO) %>%
+  # Resumir variables beneficiario alumno integrado
+  summarize(Beneficiarios = sum(Beneficiarios))
+
+rm(anio_i,k,lista_PIE,ruta)
+
+```
+
+```{r}
+kable(PIE_ACTUAL,booktabs=T,row.names = FALSE,
+      caption = paste("Estudiantes beneficiarios Programa Integración Escolar (PIE), año",
+                      anioPIE,sep = " "),
+      align = c("l",rep("c",ncol(PIE_ACTUAL)-1)),
+      format.args = list(big.mark=".")) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(0,color = "white",background = "#3333FF") %>%
+  add_footnote("Fuente: Centro de Estudios, Ministerio de Educación",notation = "none") %>%
+  add_footnote(paste("Base utilizada: Matrícula Oficial por Estudiante, año",anioPIE,sep = " "), notation = "none") %>%
+  add_footnote("Nota: Porcentaje de estudiantes beneficiarios corresponde a la suma de los estudiantes beneficiarios PIE sobre la matrícula municipal por comuna",notation = "none")
+```
+
+```{r, fig.cap= "Evolución del número de alumnos beneficiarios Programa Integración Escolar (PIE)", fig.align='center'}
+
+ggplot(PIE_HIST, aes(x=AGNO,y=Beneficiarios)) +
+  geom_line(color = "#0000FF") +
+  labs(x="Año",y="N° Estudiantes",caption = "Fuente: Centro de Estudios, Ministerio de Educación") +
+  geom_label(aes(label=Beneficiarios), fill = "blue", color = "white")
+
+```
+
+## Proyecciones de población en el territorio
+
+```{r Poblacion_2, include=FALSE}
+
+# Eliminar variables Comuna y Poblacion 0-18
+POB_MAX <- POB_ACTUAL_COM %>% select(-c(Comuna,"Poblacion de 0-18 años")) %>%
+  # Crear fila de totales
+  bind_rows(summarise_all(., ~if(is.numeric(.)) sum(.) else "Total")) %>%
+  # Seleccionar ultima fila de totales
+  tail(n=1)
+
+# Extender tabla
+POB_MAX <- gather(data = POB_MAX,key="Rango",value="Poblacion") %>%
+  # Ordenar de forma descendiente
+  arrange(desc(Poblacion))
+
+```
+
+
+El territorio de `r nombre_SLEP[i]` tiene `r format(POB_ACTUAL_SLEP[[2]],big.mark=".")` habitantes proyectados al `r anioP`, correspondiente al `r paste(round((POB_ACTUAL_SLEP[[2]]/POB_REGION[[2]])*100,1),"%",sep="")` de la población regional, de estos un `r paste(round(sum(POB_ACTUAL_COM["Poblacion de 0-18 años"])/POB_ACTUAL_SLEP[[2]]*100,1),"%",sep="")` (`r format(sum(POB_ACTUAL_COM["Poblacion de 0-18 años"]),big.mark=".")` habitantes) corresponde a la población entre 0-18 años.
+
+La distribución de edad nos revela la mayor concentración de personas en el tramo `r POB_MAX[1,1]` con un total de `r format(POB_MAX[[1,2]],big.mark=".")` habitantes proyectados al año `r anioP`, como se muestra en la tabla de distribución de la proyección de la población por tramos de edad hasta los 18 años en el territorio del Servicio Local.
+
+```{r distribucion poblacion, include=FALSE}
+
+# Unir base de poblacion por comuna y Comunas del SLEP
+DIST_POB <- merge(POB_ACTUAL_COM,COM_SLEP,by.x = "Comuna",by.y = "COD_COM")
+# Reubicar nombre de comuna
+DIST_POB <- DIST_POB %>% relocate(NOM_COM, .before = Comuna) %>%
+  select(-c(Comuna)) %>% rename(Comuna = NOM_COM)
+
+```
+
+```{r}
+kable(DIST_POB,booktabs=T,row.names = FALSE,
+      caption = paste("Distribución de la Proyección de población por tramos de edad por comuna, año",
+                      anioP,sep = " "),
+      align = c("l",rep("c",ncol(DIST_POB)-1)),
+      format.args = list(big.mark=".")) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(0,color = "white",background = "#3333FF") %>%
+  add_footnote("Fuente: CENSO 2017 – INE. Estimaciones y proyecciones 2002 - 2035",notation = "none")
+
+```
+
+```{r distribucion porcentaje poblacion, include=FALSE}
+# Crear variable de poblacion escolar y porcentaje de la poblacion total
+DIST_POR_POB <- DIST_POB %>%
+  mutate("Poblacion escolar" = `Poblacion de 6-13 años` + `Poblacion de 14-18 años`,
+         Porcentaje = round(`Poblacion escolar`/sum(`Poblacion escolar`)*100,2)) %>%
+  # Seleccionar variables de interes
+  select(Comuna,Porcentaje)
+
+```
+
+```{r, fig.cap= "Distribución en porcentaje de la población en edad escolar (entre 6 y 18 años) por comuna", fig.align='center'}
+
+# Crear auxiliares para ubicar labels dentro del grafico de torta
+grafico <- DIST_POR_POB %>%
+  arrange(desc(Comuna)) %>%
+  mutate(prop = Porcentaje / sum(Porcentaje) *100) %>%
+  mutate(ypos = cumsum(prop)- 0.5*prop )
+
+ggplot(grafico, aes(x="",y=prop, fill = Comuna)) +
+  geom_bar(stat = "identity", width = 1, color = "white") +
+  coord_polar("y", start = 0) +
+  labs(caption = paste("CENSO 2017 – INE. Estimaciones y proyecciones 2002 – 2035. Población año",anioP,sep = " "))+
+  theme_void()+
+  geom_text(aes(y= ypos, label = Porcentaje),color = "black")
+
+rm(grafico)
+```
+
+```{r, fig.cap= "Proyecciones de población en edad escolar (entre 6 y 18 años) en el territorio del SLEP", fig.align='center'}
+
+ggplot(PROY_POB_SLEP, aes(x=agno,y=Poblacion_escolar)) +
+  geom_line(color = "#0000FF") +
+  labs(x="Año",y="Población en edad escolar",caption = "Fuente: CENSO 2017 – INE. Estimaciones y proyecciones 2002 – 2035") +
+  geom_label(aes(label=Poblacion_escolar), fill = "blue", color = "white")
+
+```
+
+```{r Poblacion 3 , include=FALSE}
+
+TRANS_PROY_POB_COM <- merge(PROY_POB_COM,COM_SLEP, by.x="Comuna", by.y = "COD_COM")
+
+TRANS_PROY_POB_COM <- spread(data = TRANS_PROY_POB_COM,key="agno",value="Poblacion_escolar",fill = 0)
+
+TRANS_PROY_POB_COM <- TRANS_PROY_POB_COM %>% select(-c(Comuna)) %>% rename(Comunas = NOM_COM) %>%
+  bind_rows(summarise_all(., ~if(is.numeric(.)) sum(.) else "TOTAL"))
+```
+
+```{r}
+kable(TRANS_PROY_POB_COM,booktabs=T,row.names = FALSE,
+      caption = "Proyección de la población en edad escolar (entre 6 y 18 años) por comuna.",
+      align = c("l",rep("c",ncol(TRANS_PROY_POB_COM)-1)),
+      format.args = list(big.mark=".")) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(0,color = "white",background = "#3333FF") %>%
+  row_spec(nrow(TRANS_PROY_POB_COM),bold = T) %>%
+  add_footnote("Fuente: CENSO 2017 – INE. Estimaciones y proyecciones 2002 – 2035.",notation = "none")
+
+```
+
+```{r eliminar elementos, include=FALSE}
+#Remover elementos que no se utilizaran y liberar espacio en memoria
+rm(list=setdiff(ls(), c("i","n_EE_publico","anioM","anioD","ruta_d","ruta_m","cod_SLEP","nombre_SLEP",
+                        "NOM_COM_CAB","NOM_REGION","COM_SLEP",
+                        "n_JI","n_COMUNAS","n_EE_publico","n_EE_total",
+                        "n_EE_PUB","n_EE_SUV","n_EE_PRI","n_EE_ADM","n_MAT_SLEP",
+                        "n_MAT_TOTAL","n_MAT_PUB","n_MAT_SUV","n_MAT_PRI","n_MAT_ADM")))
+gc()
+```
+
+
+# Caracterización de la Oferta Educativa en el territorio del Servicio Local de Educación Pública `r nombre_SLEP[i]`
+
+## Resumen Oferta de Educación Pública en el territorio
+
+El territorio del Servicio Local de Educación Pública `r nombre_SLEP[i]` posee una oferta educativa de `r n_EE_total[[2]]` establecimientos educacionales distribuidos de la siguiente forma: `r n_EE_PUB` establecimientos de administración Municipal o pública `r ifelse(n_EE_SUV == 0,"",paste(", ",n_EE_SUV," establecimientos de administración Subvencionada",sep=""))` `r ifelse(n_EE_PRI == 0,"",paste(", ",n_EE_PRI," establecimientos de administración Privada",sep=""))` `r ifelse(n_EE_ADM == 0,"",paste(", ",n_EE_ADM," establecimientos de administración Delegada",sep=""))`
+
+Respecto a la distribución de la matrícula, se tiene que un `r paste(round(n_MAT_PUB/n_MAT_TOTAL[[2]]*100,1),"%",sep="")` de los estudiantes pertenecen a establecimientos municipales o públicos `r ifelse(n_MAT_SUV == 0,"",paste(", ",round(n_MAT_SUV/n_MAT_TOTAL[[2]]*100,1),"% pertenecen a establecimientos Subvencionados",sep=""))` `r ifelse(n_MAT_PRI == 0,"",paste(", ",round(n_MAT_PRI/n_MAT_TOTAL[[2]]*100,1),"% pertenecen a establecimientos Privados",sep=""))` `r ifelse(n_MAT_ADM == 0,"",paste(", ",round(n_MAT_ADM/n_MAT_TOTAL[[2]]*100,1),"% pertenecen a establecimientos de administración Delegada",sep=""))`
+
+```{r Resumen oferta educativa, include=FALSE}
+
+# Auxiliar
+anio_i = anioM - 9
+
+# Abrir archivo de matricula de hace 10 anios
+MAT_TOT_I <- read_delim(paste(ruta_m,"/Resumen_Matrcula_EE_",anio_i,"_oficial.csv",sep = ""),delim = ";") %>% 
+  rename_with(toupper)
+# Crear codigo SLEP
+MAT_TOT_I <- MAT_TOT_I %>% mutate(SLEP=cod_SLEP(COD_COM_RBD)) %>%
+  # Filtrar por SLEP
+  filter(SLEP == nombre_SLEP[i])
+
+# Matricula publica del territorio
+MAT_PUB_I <- sum(MAT_TOT_I$MAT_TOTAL[MAT_TOT_I$COD_DEPE2 %in% c(1,5)])
+# Matricula total del territorio
+MAT_TOT_I <- sum(MAT_TOT_I$MAT_TOTAL)
+
+# Crear tabla de resumen oferta educativa en el territorio
+RES_TERR <- data.frame(Var1 = c(paste("Matrícula total",anioM,sep = " "),
+                                paste("Variación matrícula ",anio_i,"-",anioM,sep = ""),
+                                paste("Matrícula rural",anioM,sep = " "),
+                                paste("Establecimientos",anioM,sep = " "),
+                                paste("Establecimientos rurales",anioM,sep = " ")),
+                       Terr = c(format(n_MAT_TOTAL[[2]],big.mark="."),
+                                paste(round((n_MAT_TOTAL[[2]]/MAT_TOT_I -1)*100,2),"%",sep = ""),
+                                format(n_MAT_TOTAL[[3]],big.mark="."),
+                                format(n_EE_total[[2]],big.mark="."),
+                                format(n_EE_total[[3]],big.mark=".")),
+                       Publ = c(format(n_MAT_SLEP[[2]],big.mark="."),
+                                paste(round((n_MAT_SLEP[[2]]/MAT_PUB_I -1)*100,2),"%",sep = ""),
+                                format(n_MAT_SLEP[[3]],big.mark="."),
+                                format(n_EE_publico[[2]],big.mark="."),
+                                format(n_EE_publico[[3]],big.mark=".")))
+
+rm(ruta,anio_i)
+```
+
+```{r}
+x <- kable(RES_TERR[,c("Var1","Terr")],booktabs=T,row.names = FALSE,
+           caption = "Resumen Oferta Educativa del territorio",
+           align = c("l",rep("c",ncol(RES_TERR[,c("Var1","Terr")])-1))) %>%
+  kable_styling(full_width = T)
+
+# Crear tabla sin encabezado
+gsub("<thead>.*</thead>", "", x)
+```
+
+```{r}
+x <- kable(RES_TERR[,c("Var1","Publ")],booktabs=T,row.names = FALSE,
+           caption = "Resumen Oferta Municipal o Pública del SLEP",
+           align = c("l",rep("c",ncol(RES_TERR[,c("Var1","Publ")])-1))) %>%
+  kable_styling(full_width = T) %>% 
+  add_footnote("Fuente: Datos Abiertos Mineduc.
+  Base utilizada: Resumen matrícula por EE.
+  Nota 1: Se consideran establecimientos en funcionamiento y con matrícula.
+  Nota 2: No se consideran Jardines infantiles administrados por JUNJI, VTF y Fundación integra.",notation = "none")
+
+# Crear tabla sin encabezado
+gsub("<thead>.*</thead>", "", x)
+```
+
+```{r distribucion matricula y establecimientos, include=FALSE}
+
+# Crear dataframe a partir de n_MAT_SLEP
+DIST_MAT <- n_MAT_SLEP %>%
+  # Crear variables urbanos y rurales
+  mutate(Urbanos = round((matricula - matricula_rural)/matricula*100,2),
+         Rurales = round(matricula_rural/matricula*100,2))  %>%
+  # Seleccionar variables de interes
+  select(Urbanos,Rurales)
+# Expandir tabla
+DIST_MAT <- gather(data = DIST_MAT,key="Tipo",value="Matricula")
+
+# Crear dataframe a partir de n_EE_publico
+DIST_EE <- n_EE_publico %>%
+  # Crear variables urbanos y rurales
+  mutate(Urbanos = paste(round((n_EE - n_EE_rural)/n_EE*100,2),"%",sep = ""),
+         Rurales = paste(round(n_EE_rural/n_EE*100,2),"%",sep = "")) %>%
+  # Seleccionar variables de interes
+  select(Urbanos,Rurales)
+# Expandir tabla
+DIST_EE <- gather(data = DIST_EE,key="Tipo",value="Establecimientos")
+
+# Unir ambas tablas
+DIST_MAT_EE <- merge(DIST_MAT,DIST_EE,by="Tipo") 
+
+rm(DIST_MAT,DIST_EE,x,RES_TERR)
+```
+
+```{r}
+kable(DIST_MAT_EE,booktabs=T,row.names = FALSE,
+           caption = "Porcentaje de distribución de matrícula y establecimientos públicos por área de emplazamiento y comuna, no incluye jardines infantiles.",
+           align = c("l",rep("c",ncol(DIST_MAT_EE)-1))) %>%
+  kable_styling(full_width = T) %>% 
+  row_spec(0,color = "white",background = "#333333") %>%
+  add_footnote("Fuente: Centro de Estudios, Ministerio de Educación",notation = "none") %>% 
+  add_footnote(paste("Base utilizada: Matrícula y establecimiento oficial año",anioM,sep = " "),notation = "none")
+
+```
+
+## Matrícula en el territorio y su evolución en el tiempo
+
+```{r Matricula territorio , include=FALSE}
+
+# Auxiliar
+anio_i = anioM - 9
+lista <- c()
+k= 1
+
+while (anio_i <= anioM){
+  # Abrir archivos
+  lista[[k]] <- read_delim(paste(ruta_m,"/Resumen_Matrcula_EE_",anio_i,"_oficial.csv",sep = ""),delim = ";") %>% 
+    rename_with(toupper)
+  # Filtrar por EE funcionando para aquellas bases que tengan esta variable
+  try(lista[[k]] <- lista[[k]] %>% filter(ESTADO_ESTAB==1))
+  # Cambiar nombre de variable anio para holomogar
+  try(names(lista[[k]])[1] <- "AGNO")
+  # Crear variable sLEP
+  lista[[k]] <- lista[[k]] %>% mutate(SLEP=cod_SLEP(COD_COM_RBD)) %>% 
+    # Seleccioanr variables de interes
+    select(AGNO,COD_DEPE2,COD_COM_RBD,MAT_TOTAL)
+  
+  anio_i = anio_i + 1
+  k= k + 1
+}
+
+# Unir lista en un solo dataframe
+MAT_TERR <- bind_rows(lista)
+# Unir base con Comunas de los SLEP
+MAT_TERR <- merge(MAT_TERR,COM_SLEP, by.x = "COD_COM_RBD", by.y ="COD_COM")
+# Crear variable dependencia
+MAT_TERR <- MAT_TERR %>% mutate(Dependencia = case_when(
+  COD_DEPE2 %in% c(1,5) ~ "Municipal/Público",
+  COD_DEPE2 == 2 ~ "Particular Subvencionado",
+  COD_DEPE2 == 3 ~ "Particular Pagado",
+  COD_DEPE2 == 4 ~ "Administración Delegada"))
+
+# Crear nuevo dataframe
+MAT_ACT_DEPE <- MAT_TERR  %>%
+  # Filtrar por ultimo anio y agrupar por comuna y dependencia
+  filter(AGNO == anioM) %>% group_by(NOM_COM,Dependencia) %>% 
+  # Resumir variables
+  summarise(Matricula = sum(MAT_TOTAL)) %>% 
+  # Renombrar variable Comuna
+  rename(Comuna = NOM_COM)
+
+# Expandir base
+MAT_ACT_DEPE <- spread(data = MAT_ACT_DEPE,key="Dependencia",value="Matricula",fill = 0)
+# Crear variable total
+MAT_ACT_DEPE$Total <- rowSums(MAT_ACT_DEPE[,c(-1)])
+# Crear ultima fila con total por columna
+MAT_ACT_DEPE <- MAT_ACT_DEPE %>% adorn_totals("row")
+
+rm(anio_i, k,lista)
+```
+
+```{r}
+kable(MAT_ACT_DEPE,booktabs=T,row.names = FALSE,
+      caption = paste("Matrícula según dependencia por comuna, año",anioM,sep=" "),
+      align = c("l",rep("c",ncol(MAT_ACT_DEPE)-1)),
+      format.args = list(big.mark=".")) %>%
+  kable_styling(full_width = T) %>% 
+  row_spec(0,color = "white",background = "#333333") %>%
+  row_spec(nrow(MAT_ACT_DEPE),bold = T) %>%
+  add_footnote("Fuente: Datos Abiertos Mineduc.",notation = "none") %>% 
+  add_footnote(paste("Base utilizada: Matrícula oficial año",anioM,sep = " "),notation = "none") %>% 
+  add_footnote("Nota: Se consideran establecimientos en funcionamiento y con matrícula.",notation = "none")
+
+```
+
+```{r Matricula historica por dependencia, include=FALSE}
+# Crear data frame con matricula historica
+MAT_HIST_DEPE <- MAT_TERR  %>%
+  # agrupar por dependencia y anio
+  group_by(Dependencia,AGNO) %>% 
+  # resumir variable total matricula
+  summarize(Matricula = sum(MAT_TOTAL,na.rm = T))
+```
+
+```{r, fig.cap= "Evolución de la Matrícula por dependencia ", fig.align='center'}
+
+ggplot(MAT_HIST_DEPE, aes(x=AGNO,y=Matricula,color=Dependencia)) +
+  geom_line() +
+  geom_point() +
+  labs(x="Años",y="Matrícula",caption = paste("Fuente: Matrícula Oficial por EE ",anioM, ", Datos Abiertos Mineduc"))+
+  theme(legend.position = "top")
+
+```
+**Nota:** Se consideran establecimientos en funcionamiento y con matrícula.
+
+```{r Porcentaje Matricula historica por depe, include=FALSE}
+# Crear dataframe de porcentaje matricula historica
+POR_MAT_HIST_DEPE <- MAT_HIST_DEPE %>% 
+  # agrupar por anio
+  group_by(AGNO) %>%
+  # Crear variable de matricula total por anio
+  mutate(Suma = sum(Matricula)) %>% 
+  # agrupar por dependencia y anio
+  group_by(Dependencia,AGNO) %>% 
+  # Resumir variables con porcentaje de matricula respecto del total del anio
+  summarise(Porcentaje = round(Matricula / Suma * 100,2))
+  
+```
+
+```{r, fig.cap= "Participación de la Matrícula por dependencia", fig.align='center'}
+ggplot(POR_MAT_HIST_DEPE, aes(x=AGNO,y=Porcentaje,fill=Dependencia)) +
+  geom_col()+
+  labs(x="Años",y="Porcentaje matrícula",caption = paste("Fuente: Matrícula Oficial por EE ",anioM,", Datos Abiertos Mineduc"))+
+  theme(legend.position = "top")+
+  geom_text(aes(label =Porcentaje),position = position_stack(vjust = 0.5),color="black")
+```
+**Nota:** Se consideran establecimientos en funcionamiento y con matrícula.
+
+A continuación, se presenta un cuadro resumen con la variación de la matrícula en las distintas dependencias del territorio:
+
+```{r Variacion matricula , include=FALSE}
+# Crear valor primer anio de la base
+anio_min <- min(MAT_HIST_DEPE$AGNO)
+# Crear valor del ultimo anio de la base
+anio_max <- max(MAT_HIST_DEPE$AGNO)
+
+# Crear dataframe y filtrar por anio
+VAR_MAT <- MAT_HIST_DEPE %>% filter(AGNO %in% c(anio_min,anio_max))
+# Expandir dataframe
+VAR_MAT <- spread(VAR_MAT, key="AGNO","Matricula")
+
+# Crear variable diferencia de matricula (matricula ultimo anio - matricula 1er anio)
+VAR_MAT$DF_MAT <- VAR_MAT[[as.name(anio_max)]] - VAR_MAT[[as.name(anio_min)]]
+# Crear variable porcentaje de variacion
+VAR_MAT$POR_VAR <- paste(round((VAR_MAT[[as.name(anio_max)]] / VAR_MAT[[as.name(anio_min)]] - 1) *100,2),"%",sep="")
+
+# Cambiar nombre de variable diferencia de matricula
+names(VAR_MAT)[names(VAR_MAT) == "DF_MAT"] <- paste("Diferencia matrícula entre ",anio_max," y ",anio_min,sep = "")
+# Cambiar nombre de variable porcentaje de variacion
+names(VAR_MAT)[names(VAR_MAT) == "POR_VAR"] <- paste("Porcentaje de variación de la matrícula ",anio_max," respecto a la del año ",anio_min,sep = "")
+# Seleccionar variables de interes
+VAR_MAT <- VAR_MAT %>% select(-c(as.name(anio_max),as.name(anio_min)))
+
+```
+
+```{r}
+kable(VAR_MAT,booktabs=T,row.names = FALSE,
+      caption = paste("Variación de la matricula entre el año ",anio_max," y ",anio_min,sep=" "),
+      align = c("l",rep("c",ncol(VAR_MAT)-1)),
+      format.args = list(big.mark=".")) %>%
+  kable_styling(full_width = T) %>% 
+  row_spec(0,color = "white",background = "#333333") %>%
+  add_footnote("Fuente: Matrícula Oficila por EE, Datos Abiertos Mineduc.",notation = "none")
+```
+
+Para interpretar la siguiente tabla, es necesario primero definir las clasificaciones según nivel de enseñanza impartidos por los establecimientos educacionales municipales:
+
+  •	Educación Parvularia: Es el primer nivel de educación formal, en donde se propone favorecer en forma sistemática, oportuna y pertinente, aprendizajes de calidad para todos los párvulos. Este nivel se imparte a través de jardines infantiles de JUNJI, Fundación Integra y establecimientos privados, en donde pueden asistir niños/as entre 85 días y 5 años de edad distribuidos en sus 6 grupos o cursos.
+  
+  •	Enseñanza básica niños: Es el segundo nivel de educación formal, en donde se desarrolla una formación integral abordando diferentes dimensiones como física, afectica, cognitiva, entre otras. Actualmente está compuesta por 8 cursos, pero a partir de 2027 tendrá sólo 6.
+  
+  •	Educación básica adultos: Es una modalidad dirigida a personas jóvenes y adultas que, por distintas razones, no iniciaron o completaron su proceso escolar. Por lo que su fin es iniciar o completar sus estudios en enseñanza básica de los estudiantes, teniendo como requisito un mínimo de 15 años.
+  
+  •	Educación Especial: Corresponde a una educación entregada a niños, niñas, jóvenes y adultos con necesidades específicas de apoyo educativo. Esto se realiza a través de programas de integración escolar (PIE) en los establecimientos de educación regular, escuelas especiales, y de las escuelas y aulas hospitalarias.
+  
+  •	Enseñanza Medio Humanista Científico, jóvenes: Pertenece al tercer nivel de educación formal, en donde los estudiantes expanden y profundizan su formación general y desarrollan conocimientos. Actualmente está compuesta por 4 cursos, pero a partir de 2027 aumentará a 6.
+  
+  •	Educación Media Humanista Científica adultos: Es una modalidad dirigida a personas jóvenes y adultas que, por distintas razones, no completaron su proceso escolar. Por lo que su fin es iniciar completar sus estudios en enseñanza media de los estudiantes, teniendo como requisito un mínimo de 17 años.
+  
+  •	Enseñanza Medio técnico profesional y artística, jóvenes: Pertenece al tercer nivel de educación formal junto a humanista científico, en donde se forman estudiantes en especialidades a que responden a necesidades del desarrollo económico de cada región y país. 
+  
+  •	Educación Media técnico profesional y artística adultos: Es una modalidad de estudios que permite completar la educación media técnico profesional y permite la obtención de un título técnico de nivel medio, teniendo como requisito un mínimo de 17 años. 
+
+```{r Matricula por ensenanza, include=FALSE}
+
+# Abrir archivo
+MAT_ENSENANZA <- read_delim(paste(ruta_m,"/Resumen_Matrcula_EE_",anioM,"_oficial.csv",sep = ""),delim = ";") 
+# Crear variable de SLEP
+MAT_ENSENANZA <- MAT_ENSENANZA %>% mutate(SLEP = cod_SLEP(COD_COM_RBD)) %>%
+  # Filtrar por SLEP, dependencia publica y EE funcionando
+  filter(SLEP == nombre_SLEP[i],COD_DEPE2 %in% c(1,5),ESTADO_ESTAB==1) %>% 
+  # Seleccionar variables de interes
+  select(COD_COM_RBD,starts_with("MAT_ENS_"),MAT_TOTAL)
+# Unir base con base Comunas por SLEP
+MAT_ENSENANZA <- merge(MAT_ENSENANZA,COM_SLEP,by.x = "COD_COM_RBD", by.y = "COD_COM")
+# Seleccionar variables de interes
+MAT_ENSENANZA <- MAT_ENSENANZA %>% select(-c(COD_COM_RBD)) %>%
+  # Renombrar variables
+  rename(`Educación Parvularia` =MAT_ENS_1, `Enseñanza Básica niños` =MAT_ENS_2,
+         `Educación Básica Adultos` =MAT_ENS_3,`Educación Especial` =MAT_ENS_4,
+         `Enseñanza Media HC Jovenes` =MAT_ENS_5,`Educación Media HC Adultos` =MAT_ENS_6,
+         `Enseñanza Media TP Jovenes` =MAT_ENS_7,`Educación Media TP Adultos` =MAT_ENS_8,
+         Comuna = NOM_COM, Total = MAT_TOTAL) %>% 
+  # Agrupar por comuna y resumir todas las variables
+  group_by(Comuna) %>% summarise_all(sum) %>% 
+  # Crear fila con total por columna
+  adorn_totals()
+```
+
+```{r}
+kable(MAT_ENSENANZA,booktabs=T,row.names = FALSE,
+      caption = paste("Matrícula pública según nivel de enseñanza por comuna, año ",anioM,sep=" "),
+      align = c("l",rep("c",ncol(MAT_ENSENANZA)-1)),
+      format.args = list(big.mark=".")) %>%
+  kable_styling(full_width = T) %>% 
+  row_spec(0,color = "white",background = "#333333") %>%
+  row_spec(nrow(MAT_ENSENANZA), bold = T) %>% 
+  add_footnote("Fuente: Matrícula Oficial por EE, Datos Abiertos Mineduc.",notation = "none") %>% 
+  add_footnote("Nota: Se consideran establecimientos en funcionamiento y con matrícula.",notation = "none")
+```
+
+```{r Porcentaje matricula por nivel ensenanza, include=FALSE}
+# Crear variable porcentaje de matricula por ensenanza, filtrar por ultima fila con totales
+# y seleccionar variables de interes
+POR_MAT_ENSE <- MAT_ENSENANZA %>% filter(row_number()==n()) %>% select(-c(Comuna,Total))
+# Expandir base
+POR_MAT_ENSE <- gather(POR_MAT_ENSE,key="Ensenanza",value="Matricula")
+# Crear variable de porcentaje
+POR_MAT_ENSE <- POR_MAT_ENSE %>% mutate(Porcentaje = round(Matricula/sum(Matricula)*100,2))
+
+```
+
+```{r, fig.cap= "Porcentaje de matrícula Pública / Municipal por nivel de enseñanza ", fig.align='center'}
+# Ordenar base por matricula (descendente)
+grafico <- arrange(POR_MAT_ENSE,desc(POR_MAT_ENSE$Matricula))
+# Transformar a factor variable de ensenanza
+grafico$Ensenanza <- factor(grafico$Ensenanza,grafico$Ensenanza)
+
+ggplot(grafico, aes(x=Ensenanza,y=Porcentaje, fill = Ensenanza)) +
+  geom_bar(stat = "identity", width = 1, color = "white") +
+  labs(x="Enseñanza",y="Porcentaje de la matrícula pública del SLEP",
+       caption = "Fuente: Matrícula Oficial por EE, Datos Abiertos Mineduc.") +
+  theme(axis.text.x = element_blank())+
+  geom_text(aes(label = Porcentaje),vjust=-0.5,color = "black")
+
+rm(grafico)
+```
+
+```{r eliminar elementos 2, include=FALSE}
+#Remover elementos que no se utilizaran y liberar espacio en memoria
+rm(list=setdiff(ls(), c("i","n_EE_publico","MAT_TERR","anioM","anioD","ruta_d","ruta_m","cod_SLEP",
+                        "nombre_SLEP","NOM_COM_CAB","NOM_REGION","COM_SLEP")))
+gc()
+```
+
+# Establecimientos Educacionales en el territorio del Servicio Local de Educación Pública
+
+## Número de Establecimientos en el territorio
+
+```{r establecimientos , include=FALSE}
+
+# Anio primera base
+anio_i = anioD - 9
+
+# auxiliares
+k = 1
+lista <- c()
+
+# Abrir archivos
+while (anio_i <= anioD){
+  
+  lista[[k]] <- read_delim(paste(ruta_d,"/directorio_oficial_EE_",anio_i,"_Oficial.csv",sep = ""),delim=";") %>% 
+    rename_with(toupper)
+  
+  # Cambiar nombre de variable anio para holomogar
+  try(names(lista[[k]])[1] <- "AGNO")
+  # Crear variable SLEP
+  lista[[k]] <- lista[[k]] %>% mutate(SLEP = cod_SLEP(COD_COM_RBD))
+  # filtrar por EE funcionando
+  try(lista[[k]] <- lista[[k]] %>% filter(ESTADO_ESTAB == 1 & MATRICULA == 1))
+  # Filtrar por SLEP
+  lista[[k]] <- lista[[k]] %>% filter(SLEP == nombre_SLEP[i]) %>%
+    # Seleccionar variable de interes
+    select(AGNO,SLEP,RBD,COD_COM_RBD,COD_DEPE,RURAL_RBD)
+  
+  k = k + 1
+  anio_i = anio_i + 1
+  
+}
+
+# Unir lista en un solo dataframe
+ESTABLECIMIENTOS <- bind_rows(lista)
+# Crear variable Dependencia y si es rural o urbano
+ESTABLECIMIENTOS <- ESTABLECIMIENTOS %>% mutate(Dependencia = case_when(
+  COD_DEPE %in% c(1,2,6) ~ "Municipal/Público",
+  COD_DEPE == 3 ~ "Particular Subvencionado",
+  COD_DEPE == 4 ~ "Particular Pagado",
+  COD_DEPE == 5 ~ "Administración Delegada"),
+  Tipo = case_when(RURAL_RBD == 1 ~ "Rural",
+                   RURAL_RBD == 0 ~ "Urbano"))
+# Unir dataframe con base COM_SLEP
+ESTABLECIMIENTOS <- merge(ESTABLECIMIENTOS,COM_SLEP, by.x = "COD_COM_RBD", by.y = "COD_COM")
+# Seleccionar variables de interes y renombrar comuna
+ESTABLECIMIENTOS <- ESTABLECIMIENTOS %>% select(-c(COD_COM_RBD,RURAL_RBD,COD_DEPE)) %>% 
+  rename(Comuna = NOM_COM)
+
+```
+
+```{r numero de establecimientos por dependencia}
+# Crear nuevo dataframe - Filtrar por anio de ultima base directorio y agrupar
+EE_DEPE <- ESTABLECIMIENTOS %>% filter(AGNO == anioD) %>% group_by(Comuna, Dependencia) %>%
+  # Resumir variables total RBD
+  summarize(n_estab = n_distinct(RBD))
+# Expandir base
+EE_DEPE <- spread(EE_DEPE,key="Dependencia",value = "n_estab",fill = 0)
+# Agregar fila y columna con totales
+EE_DEPE <- EE_DEPE %>% adorn_totals(c("row","col"))
+```
+
+```{r}
+kable(EE_DEPE,booktabs=T,row.names = FALSE,
+           caption = paste("Número de establecimientos según dependencia y por comuna, año ",anioD,sep = ""),
+           align = c("l",rep("c",ncol(EE_DEPE)-1))) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(0,color = "white",background = "#00CC00") %>%
+  row_spec(nrow(EE_DEPE),bold = T) %>% 
+  add_footnote(paste("Fuente: Directorio Oficial de Establecimientos",anioD,", Datos abiertos Mineduc.",sep = " "), notation = "none") %>% 
+  add_footnote("Nota: Se consideran establecimientos en funcionamiento y con matrícula", notation = "none")
+
+```
+
+```{r tipo de establecimientos por comuna}
+# Crear nuevo dataframe - filtrar por anio actual y agrupar por comuna
+EE_TIPO <- ESTABLECIMIENTOS %>% filter(AGNO == anioD) %>% group_by(Comuna, Tipo) %>%
+  # Resumir variables suma de RBD
+  summarize(n_estab = n_distinct(RBD))
+# Expandir base
+EE_TIPO <- spread(EE_TIPO,key="Tipo",value = "n_estab",fill = 0)
+# Agregar fila y columna con totales
+EE_TIPO <- EE_TIPO %>% adorn_totals(c("row","col"))
+```
+
+```{r}
+kable(EE_TIPO,booktabs=T,row.names = FALSE,
+           caption = paste("Número de establecimientos según dependencia y por comuna, año ",anioD,sep = ""),
+           align = c("l",rep("c",ncol(EE_TIPO)-1))) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(0,color = "white",background = "#00CC00") %>%
+  row_spec(nrow(EE_TIPO),bold = T) %>% 
+  add_footnote(paste("Fuente: Directorio Oficial de Establecimientos",anioD,", Datos abiertos Mineduc.",sep = " "), notation = "none") %>% 
+  add_footnote("Nota: Se consideran establecimientos en funcionamiento y con matrícula", notation = "none")
+```
+
+```{r Establecimientos por dependencia historico, include=FALSE}
+# Crear dataframe con datos historicos de establecimeintos y agrupar
+EE_HIST_DEPE <- ESTABLECIMIENTOS %>% group_by(AGNO, Dependencia) %>%
+  # Resumir variables sumar EE
+  summarize(n_estab = n())
+
+```
+
+```{r, fig.cap= "Evolución del número de establecimientos por dependencia en el territorio", fig.align='center'}
+
+ggplot(EE_HIST_DEPE, aes(x=AGNO,y=n_estab,color=Dependencia)) +
+  geom_line() +
+  geom_point() +
+  labs(x="Años",y="N° de Establecimientos",
+       caption = paste("Fuente: Directorio Oficial de Establecimientos",anioD,", Datos abiertos Mineduc.",sep = " "))+
+  theme(legend.position = "top")
+
+```
+**Nota:** Se consideran establecimientos en funcionamiento y con matrícula.
+
+Con el objetivo de recopilar antecedentes para el traspaso de los establecimientos educacionales, se procede a detallar en la siguiente tabla, aquellos establecimientos educacionales de dependencia municipal/público que se encuentran en receso o han sufrido cambios en su estado de funcionamiento entre los años `r anioD-6` y `r anioD`.
+
+```{r Establecimientos publicos que varian su estado, include=FALSE}
+# Anio primera base
+anio_i = anioD - 6
+
+# auxiliares
+k = 1
+lista <- c()
+
+# Abrir archivos
+while (anio_i <= anioD){
+  
+  # Abrir archivos
+  lista[[k]] <- read_delim(paste(ruta_d,"/directorio_oficial_EE_",anio_i,"_Oficial.csv",sep = ""),delim=";") %>% 
+    rename_with(toupper)
+  
+  # Cambiar nombre de variable anio para holomogar
+  try(names(lista[[k]])[1] <- "AGNO")
+  # Crear variable SLEP
+  lista[[k]] <- lista[[k]] %>% mutate(SLEP = cod_SLEP(COD_COM_RBD)) %>% 
+    # Filtrar por SLEP y EE publicos
+    filter(SLEP == nombre_SLEP[i], COD_DEPE2 %in% c(1,5)) %>%
+    # Seleccionar variable de interes
+    select(AGNO,RBD,COD_COM_RBD,ESTADO_ESTAB)
+  
+  k = k + 1
+  anio_i = anio_i + 1
+  
+}
+
+# Unir lista en un solo dataframe
+ESTADO_EE <- bind_rows(lista)
+# Unir dataframe con base COM_SLEP
+ESTADO_EE <- merge(ESTADO_EE,COM_SLEP, by.x = "COD_COM_RBD", by.y = "COD_COM")
+# Seleccionar variables de interes y renombrar variable Comuna
+ESTADO_EE <- ESTADO_EE %>% select(-COD_COM_RBD) %>% rename(Comuna = NOM_COM)
+
+# Crear dataframe auxiliar, ordenar por anio y rbd, y agrupar por rbd
+AUXILIAR <- ESTADO_EE %>% arrange(AGNO,RBD) %>% group_by(RBD) %>% 
+  # Crear variable aux (Verifica su hubo un cambio de estado en el funcionamiento del EE)
+  mutate(aux = ESTADO_ESTAB - lag(ESTADO_ESTAB))
+# reemplazar nulos
+AUXILIAR[is.na(AUXILIAR)]<-0
+# filtrar por aux distinto de 0
+AUXILIAR <- AUXILIAR %>% 
+  filter(aux != 0) %>%
+  # Crear variable de ayuda
+  mutate(cambio_estado = 1) %>%
+  # Seleccionar variables de interes
+  select(RBD,cambio_estado)%>% 
+  # Eliminar duplicados de variable RBD
+  distinct(RBD, .keep_all = T)
+
+# Unir base ESTADO_EE con base Auxiliar
+ESTADO_EE <- left_join(ESTADO_EE,AUXILIAR,by="RBD")
+# Filtrar por EE en Receso o que hayan cambiado de estado
+ESTADO_EE <- ESTADO_EE %>% filter(ESTADO_ESTAB == 2 | cambio_estado == 1) %>% 
+  # Crear variable de Estado (descripcion)
+  mutate(ESTADO_DESC = case_when(
+    ESTADO_ESTAB == 1 ~ "F",
+    ESTADO_ESTAB == 2 ~ "ER",
+    ESTADO_ESTAB == 3 ~ "C",
+    ESTADO_ESTAB == 4 ~ "F*")) %>% 
+  # Seleccionar variables de interes
+  select(-c(ESTADO_ESTAB,cambio_estado))
+# Expandir base
+ESTADO_EE <- spread(ESTADO_EE,key = "AGNO",value = "ESTADO_DESC")
+
+# Ejecutar en caso de que no existan datos en dataframe ESTADO_EE
+if (dim(ESTADO_EE)[1] == 0){
+  
+  ESTADO_EE[1,] = c("N/A","NO EXISTEN ESTABLECIMIENTOS CON CAMBIO DE ESTADO O EN RECESO EN ESTE PERIODO DE TIEMPO")
+}
+
+rm(lista,AUXILIAR,anio_i,k)
+```
+
+```{r}
+kable(ESTADO_EE,booktabs=T,row.names = FALSE,
+           caption = "Establecimientos educaciones municipales con variación en su estado de funcionamiento o en receso",
+           align = c("l",rep("c",ncol(ESTADO_EE)-1))) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(0,color = "white",background = "#00CC00") %>%
+  add_footnote(paste("Fuente: Directorio Oficial de Establecimientos",anioD,", Datos abiertos Mineduc.",sep = " "), notation = "none") %>% 
+  add_footnote("Nota: F: Funcionando, ER: En Receso, F*: Funcionando sin matrícula, C: Cerrado", notation = "none")
+
+```
+
+```{r matricula cap 3, include=FALSE}
+
+#Abrir archivo de Matricula
+MAT_EE <- read_delim(paste(ruta_m,"/Resumen_Matrcula_EE_",anioM,"_oficial.csv",sep = ""),delim = ";") %>% 
+  rename_with(toupper)
+# Crear variable SLEP
+MAT_EE <- MAT_EE %>% mutate(SLEP = cod_SLEP(COD_COM_RBD)) %>% 
+  # Filtrar por SLEP, EE publicos, estado funcionando y matricula mayor a cero
+  filter (SLEP == nombre_SLEP[i],COD_DEPE2 %in% c(1,5), ESTADO_ESTAB == 1, MAT_TOTAL > 0) %>% 
+  # Seleccionar variables de interes
+  select(RBD,COD_COM_RBD,starts_with("MAT_ENS_"), MAT_TOTAL)
+# Unir base con COM_SLEP
+MAT_EE <- merge(MAT_EE,COM_SLEP, by.x = "COD_COM_RBD", by.y = "COD_COM") %>% 
+  # Renombrar variable Comuna y seleccionar variables de interes
+  rename(Comuna =NOM_COM) %>% select(-COD_COM_RBD) %>% 
+  # Crear variable de categoria de EE segun matricula
+  mutate(CAT_EE_DES = case_when(
+    MAT_TOTAL<=19 ~ 1,
+    MAT_TOTAL>= 20 & MAT_TOTAL<=149 ~ 2,
+    MAT_TOTAL>= 150 & MAT_TOTAL<=499 ~ 3,
+    MAT_TOTAL>= 500 & MAT_TOTAL<=799 ~ 4,
+    MAT_TOTAL>= 800 ~ 5))
+
+```
+
+```{r numero de EE segun cantidad de estudiante}
+# Crear nuevo dataframe y agrupar
+EE_CAT_MAT <- MAT_EE %>% group_by(Comuna, CAT_EE_DES) %>% 
+  # Resumir variables numero de establecimientos por categoria
+  summarise(CAT_EE = n())
+# Expandir tabla
+EE_CAT_MAT <- spread(EE_CAT_MAT,key="CAT_EE_DES", value = "CAT_EE",fill = 0)
+# Renombrar variables en caso de que existan
+try(names(EE_CAT_MAT)[names(EE_CAT_MAT) == "1"] <- "Entre 1-19 estudiantes")
+try(names(EE_CAT_MAT)[names(EE_CAT_MAT) == "2"] <- "Entre 20-149 estudiantes")
+try(names(EE_CAT_MAT)[names(EE_CAT_MAT) == "3"] <- "Entre 150-499 estudiantes")
+try(names(EE_CAT_MAT)[names(EE_CAT_MAT) == "4"] <- "Entre 500-799 estudiantes")
+try(names(EE_CAT_MAT)[names(EE_CAT_MAT) == "5"] <- "Entre 800 o más estudiantes")
+
+# Agregar fila y columna con totales
+EE_CAT_MAT <- EE_CAT_MAT %>% adorn_totals(name=c("TOTAL","Total"), c("row","col"))
+```
+
+```{r}
+kable(EE_CAT_MAT,booktabs=T,row.names = FALSE,
+           caption = paste("Número de establecimientos municipales según cantidad de estudiantes por comuna, año ",anioM,sep = ""),
+           align = c("l",rep("c",ncol(EE_CAT_MAT)-1))) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(0,color = "white",background = "#00CC00") %>%
+  row_spec(nrow(EE_CAT_MAT),bold = T) %>% 
+  add_footnote(paste("Fuente: Matrícula Oficial por EE ",anioM,", Datos abiertos Mineduc.",sep = ""), notation = "none") %>% 
+  add_footnote("Nota: Se consideran establecimientos en funcionamiento y con matrícula ", notation = "none")
+```
+
+La siguiente tabla muestra la distribución según nivel de enseñanza impartido por cada establecimiento educacional municipal del territorio. Cabe destacar que, un establecimiento educacional puede impartir más de un nivel de enseñanza. 
+
+```{r numero establecimientos segun nivel de ensenanza ofrecido}
+# Crear nuevo dataframe y seleccionar variables de interes
+EE_ENS <- MAT_EE %>% select(-c(CAT_EE_DES,MAT_TOTAL))
+# Expandir base
+EE_ENS <- gather(data = EE_ENS,key="ENS",value="Matricula",-c(RBD,Comuna))
+# Crear nueva variables de nivel de ensenanza
+EE_ENS <- EE_ENS %>% mutate("Nivel de Enseñanza"= case_when(
+  ENS == "MAT_ENS_1" ~ "Educación Parvularia",
+  ENS == "MAT_ENS_2" ~ "Enseñanza Básica Niños",
+  ENS == "MAT_ENS_3" ~ "Educación Básica Adultos",
+  ENS == "MAT_ENS_4" ~ "Educación Especial",
+  ENS == "MAT_ENS_5" ~ "Enseñanza Media HC Jóvenes",
+  ENS == "MAT_ENS_6" ~ "Educación Media HC Adultos",
+  ENS == "MAT_ENS_7" ~ "Enseñanza Media TP y artística, Jóvenes",
+  ENS == "MAT_ENS_8" ~ "Educación Media TP y artística, Adultos")) %>%
+  # Filtrar por matricula mayor a cero
+  filter(Matricula > 0) %>% 
+  # Agrupar por nivel de ensenanza
+  group_by(`Nivel de Enseñanza`) %>%
+  # Resumen variables
+  summarise("N° de EE que imparten el nivel" = n(),
+            Matrícula = sum(Matricula)) %>% 
+  # Mutar variable a caracter (Esto para no considerarla dentro de la fila de totales)
+  mutate("N° de EE que imparten el nivel" = as.character(`N° de EE que imparten el nivel`)) %>% 
+  # Agregar fila con totales
+  adorn_totals("row",fill=NA) %>%
+  # Reconvertir formato de datos
+  type.convert(as.is=T)
+
+```
+
+```{r}
+kable(EE_ENS,booktabs=T,row.names = FALSE,
+           caption = paste("Número de establecimientos municipales según nivel de enseñanza ofrecida, año ",anioM,sep = ""),
+           align = c("l",rep("c",ncol(EE_ENS)-1)),
+      format.args = list(big.mark=".")) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(0,color = "white",background = "#00CC00") %>%
+  row_spec(nrow(EE_ENS),bold = T) %>% 
+  add_footnote(paste("Fuente: Matrícula Oficial por EE ",anioM,", Datos abiertos Mineduc.",sep = ""), notation = "none") %>% 
+  add_footnote("Nota: Se consideran establecimientos en funcionamiento y con matrícula.", notation = "none")
+```
+
+
+```{r numero de EE segun nivel de ensenanza ofrecido por comuna}
+# Crear nuevo dataframe y seleccionar variables de interes
+EE_COM_ENS <- MAT_EE %>% select(-c(RBD,CAT_EE_DES,MAT_TOTAL))
+# Agrupar por comuna
+EE_COM_ENS <- EE_COM_ENS %>% group_by(Comuna) %>% 
+  # Resumir variables
+  summarise("Educación Parvularia"= sum(MAT_ENS_1>0),
+            "Enseñanza Básica Niños"= sum(MAT_ENS_2>0),
+            "Educación Básica Adultos"= sum(MAT_ENS_3>0),
+            "Educación Especial"= sum(MAT_ENS_4>0),
+            "Enseñanza Media HC Jóvenes"= sum(MAT_ENS_5>0),
+            "Educación Media HC Adultos"= sum(MAT_ENS_6>0),
+            "Enseñanza Media TP y artística, Jóvenes"= sum(MAT_ENS_7>0),
+            "Educación Media TP y artística, Adultos"= sum(MAT_ENS_8>0)) %>% 
+  # Crear fila y columna con totales
+  adorn_totals(c("row","col"))
+```
+
+```{r}
+kable(EE_COM_ENS,booktabs=T,row.names = FALSE,
+           caption = paste("N° de EE municipales según nivel de enseñanza ofrecida por comuna, año ",anioM,sep = ""),
+           align = c("l",rep("c",ncol(EE_COM_ENS)-1)),
+      format.args = list(big.mark=".")) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(0,color = "white",background = "#00CC00") %>%
+  row_spec(nrow(EE_COM_ENS),bold = T) %>% 
+  add_footnote(paste("Fuente: Matrícula Oficial por EE ",anioM,", Datos abiertos Mineduc.",sep = ""), notation = "none") %>% 
+  add_footnote("Nota: Se consideran establecimientos en funcionamiento y con matrícula.", notation = "none")
+
+```
+
+```{r distribucion EE por ensenanza, include=FALSE}
+# Crear dataframe de porcentaje de EE por ensenanza, filtrar por ultima fila con totales
+# y seleccionar variables de interes
+DIST_EE_ENS <- EE_COM_ENS %>% filter(row_number()==n()) %>% select(-c(Comuna,Total))
+# Expandir base
+DIST_EE_ENS <- gather(DIST_EE_ENS,key="Ensenanza",value="Establecimientos")
+# Crear variable de porcentaje
+DIST_EE_ENS <- DIST_EE_ENS %>% mutate(Porcentaje = round(Establecimientos/n_EE_publico$n_EE *100,2))
+
+```
+
+```{r, fig.cap= "Porcentaje de EE municipales/públicos que ofrecen el nivel de enseñanza", fig.align='center'}
+# Ordenar base por matricula (descendente)
+grafico <- arrange(DIST_EE_ENS,desc(DIST_EE_ENS$Establecimientos))
+# Transformar a factor variable de ensenanza
+grafico$Ensenanza <- factor(grafico$Ensenanza,grafico$Ensenanza)
+
+ggplot(grafico, aes(x=Ensenanza,y=Porcentaje, fill = Ensenanza)) +
+  geom_bar(stat = "identity", width = 1, color = "white") +
+  labs(x="Enseñanza",y="Porcentaje de EE que imparten el nivel de enseñanza",
+       caption = paste("Fuente: Matrícula Oficial por EE ",anioM, ". Datos Abiertos Mineduc.")) +
+  theme(axis.text.x = element_blank())+
+  geom_text(aes(label = Porcentaje),vjust=-0.5,color = "black")
+
+rm(grafico)
+```
+
+# Educación Parvularia en el territorio del Servicio Local de Educación Pública
+
+# Docentes y Asistente de la Educación en el territorio del Servicio Local de Educación Pública
+
+## Docentes de aula y docentes totales en el territorio
+
+Para efectos de definición y diferencia entre función docente y docente de aula nos regiremos por lo estipulado en el artículo 6° del Estatuto Docente, en lo cual se enuncia que _“La función **docente** es aquella de carácter profesional de nivel superior, que lleva a cabo directamente los procesos sistemáticos de enseñanza y educación, lo que incluye el diagnóstico, planificación, ejecución y evaluación de los mismos procesos y de las actividades generales y complementarias que tienen lugar en las unidades educacionales de nivel parvulario, básico y medio. Para los efectos de esta ley se entenderá por: **Docencia de aula**: La acción o exposición personal directa realizada en forma continua y sistemática por el docente, inserta dentro del proceso educativo.”_
+
+```{r Docentes, include=FALSE}
+#------------------------------------------------------------------------------#
+# Anio de la ultima base de docentes disponible
+anioDOC <- 2021
+# Ruta del archivo
+ruta <-"D:/OneDrive - Dirección de Educación Pública/DEP/Basedatos/Docentes/MRUN"
+
+#------------------------------------------------------------------------------#
+
+#auxiliar
+anio_i = anioDOC - 9
+lista <- c()
+k = 1
+
+while(anio_i <= anioDOC){
+
+lista[[k]] <- read_delim(paste(ruta,"/Docentes_",anio_i,".csv",sep = ""),delim = ";") %>% 
+  rename_with(toupper)
+
+names(lista[[k]])[1] <- "AGNO"
+
+try(lista[[k]] <- lista[[k]] %>% filter(ESTADO_ESTAB==1))
+
+lista[[k]] <- lista[[k]] %>% mutate(SLEP = cod_SLEP(COD_COM_RBD)) %>% 
+  filter(SLEP == nombre_SLEP[i]) %>% 
+  select(AGNO,MRUN,COD_COM_RBD,ID_IFP,COD_DEPE,ID_ITC,HORAS_CONTRATO)
+
+anio_i = anio_i + 1
+k = k + 1
+
+}
+
+DOCENTES <- bind_rows(lista)
+
+DOCENTES <- merge(DOCENTES,COM_SLEP,by.x = "COD_COM_RBD", by.y= "COD_COM") %>% 
+  rename(Comuna = NOM_COM) %>% select(-COD_COM_RBD)
+
+```
+
+
+```{r docentes municipales segun funcion principal , include=FALSE}
+
+DOC_FUN_P <- DOCENTES %>% filter(COD_DEPE %in% c(1,2,6), AGNO == anioDOC) %>% 
+  group_by(ID_IFP) %>% 
+  summarize("N° de docentes"= n())
+
+DOC_FUN_P <- DOC_FUN_P %>%
+  mutate("Porcentaje de docentes" = round(`N° de docentes`/sum(DOC_FUN_P$`N° de docentes`) * 100,2),
+         "Lugar de desempeño" = case_when(
+           ID_IFP %in% c(1,2,3,4,5,6,7,8,9,15,16,17) ~ "En el Establecimiento educacional",
+           ID_IFP %in% c(10,11,12,13,14) ~ "En el sostenedor")) %>% 
+  arrange(`Lugar de desempeño`)
+
+DOC_FUN_P <- DOC_FUN_P %>% relocate(`Lugar de desempeño`,.before = ID_IFP) %>% 
+  mutate(ID_IFP = case_when(
+    ID_IFP == 0 ~ "No tiene función", 
+    ID_IFP == 1 ~ "Docente de aula",
+    ID_IFP == 2 ~ "Planta Técnico-pedagógica", 
+    ID_IFP == 3 ~ "Planta Directiva",
+    ID_IFP == 4 ~ "Director(a)", 
+    ID_IFP == 5 ~ "Otra en el establecimiento",
+    ID_IFP == 6 ~ "Otra fuera del establecimiento",  
+    ID_IFP == 7 ~ "Jefe Unidad Técnico-Pedagógica",
+    ID_IFP == 8 ~ "Inspector General",
+    ID_IFP == 9 ~ "Orientador",
+    ID_IFP == 10 ~ "Directiva",
+    ID_IFP == 11 ~ "Técnico-Pedagógica",
+    ID_IFP == 12 ~ "Supervisión",
+    ID_IFP == 13 ~ "Jefe DAEM",
+    ID_IFP == 14 ~ "Jefe Corporación Municipal",
+    ID_IFP == 15 ~ "Subdirector",
+    ID_IFP == 16 ~ "Profesor(a) encargado(a) del Establecimiento",
+    ID_IFP == 17 ~ "Educador(a) tradicional")) %>% 
+  rename("Función principal del docente" = ID_IFP) %>% 
+  adorn_totals(name="TOTAL","row")
+
+```
+
+```{r}
+
+kable(DOC_FUN_P,booktabs=T,row.names = FALSE,
+           caption = paste("Número de docentes municipales según función principal, año ",anioDOC,sep = ""),
+           align = c("l",rep("c",ncol(DOC_FUN_P)-1)),
+      format.args = list(big.mark=".")) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(0,color = "white",background = "#FF3300") %>%
+  row_spec(nrow(DOC_FUN_P),bold = T) %>% 
+  add_footnote(paste("Fuente: Cargos docentes ",anioM,", Datos abiertos Mineduc.",sep = ""), notation = "none") %>% 
+  add_footnote("Nota: Se consideran establecimientos en funcionamiento y con matrícula.", notation = "none")
+
+```
+
+```{r Docentes de aula segun dependencia, include=FALSE}
+
+DOC_AULA_DEPE <- DOCENTES %>% filter(AGNO == anioDOC, ID_IFP==1) %>% 
+  group_by(Comuna, COD_DEPE) %>%
+  summarise(TOT_DOC = n())
+
+DOC_AULA_DEPE <- DOC_AULA_DEPE %>% mutate(COD_DEPE = case_when(
+  COD_DEPE %in% c(1,2,6) ~ "Municipal/Público",
+  COD_DEPE == 3 ~ "Particular Subvencionado",
+  COD_DEPE == 4 ~ "Particular Pagado",
+  COD_DEPE == 5 ~ "Administración Delegada"))
+
+DOC_AULA_DEPE <- spread(DOC_AULA_DEPE,key = "COD_DEPE",value = "TOT_DOC",fill = 0) %>% 
+  adorn_totals(name=c("TOTAL","Total"),where = c("row","col"))
+
+```
+
+```{r}
+
+kable(DOC_AULA_DEPE,booktabs=T,row.names = FALSE,
+           caption = paste("Número de docentes de aula según dependencia por comuna, año ",anioDOC,sep = ""),
+           align = c("l",rep("c",ncol(DOC_AULA_DEPE)-1)),
+      format.args = list(big.mark=".")) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(0,color = "white",background = "#FF3300") %>%
+  row_spec(nrow(DOC_AULA_DEPE),bold = T) %>% 
+  add_footnote(paste("Fuente: Cargos docentes ",anioM,", Datos abiertos Mineduc.",sep = ""), notation = "none") %>% 
+  add_footnote("Nota: Se consideran establecimientos en funcionamiento y con matrícula.", notation = "none")
+
+```
+
+En el siguiente gráfico sólo se consideran a los docentes que prestan funciones en los Establecimientos Educacionales, es decir, se excluyen a aquellos que prestan funciones en la administración central (DAEM o corporación municipal).
+
+```{r evolucion numero docente, include=FALSE}
+
+EVOL_DOC <- DOCENTES %>%
+  #Filtrar por codigo dependencia y función
+  filter(COD_DEPE %in% c(1,2,6), !ID_IFP %in% c(10,11,12,13,14)) %>% 
+  # crear variable de docente de aula 
+  mutate(DOC_AULA = if_else(ID_IFP == 1, 1, 0)) %>%
+  # Seleccionar variables de interes
+  select(MRUN,AGNO,DOC_AULA)
+
+# Agrupar variables por anio
+EVOL_DOC <- EVOL_DOC %>% group_by(AGNO) %>% summarize("Docentes de aula" = sum(DOC_AULA),
+                                                      "Total Docentes" = n())
+EVOL_DOC <- gather(EVOL_DOC, key="TIPO_DOC",value="N_DOC",-AGNO)
+
+```
+
+```{r, fig.cap= "Evolución del número de docentes municipales/públicos", fig.align='center'}
+
+ggplot(EVOL_DOC, aes(x=AGNO,y=N_DOC,color=TIPO_DOC)) +
+  geom_line() +
+  geom_point() +
+  labs(x="Años",y="N° de docentes",
+       caption = paste("Fuente: Cargos docentes ",anioD,", Datos abiertos Mineduc.",sep = " "))+
+  theme(legend.position = "top", legend.title = element_blank()) +
+  #geom_text(aes(label=N_DOC),vjust=-0.4, color = "black")
+  geom_label(aes(label=N_DOC),fill="white",color = "black")
+```
+**Nota:** Se consideran establecimientos funcionando con matrícula.
+
+```{r docentes de aula versus matricula total, include=FALSE}
+
+MAT_TOTAL <- MAT_TERR %>% filter(COD_DEPE2 %in% c(1,5)) %>% 
+  group_by(AGNO) %>% 
+  summarize("Matrícula Municipal/Público"= sum(MAT_TOTAL))
+
+EVOL_DOC_MAT <- EVOL_DOC %>% filter(TIPO_DOC=="Docentes de aula") %>% select(AGNO,N_DOC)
+  
+EVOL_DOC_MAT<- merge(EVOL_DOC_MAT,MAT_TOTAL, by = "AGNO")
+
+EVOL_DOC_MAT_TA <- EVOL_DOC_MAT %>% arrange(desc(AGNO)) %>%
+  mutate(AGNO = as.character(AGNO)) %>%
+  rename("Año" =AGNO, "Docentes de aula"=N_DOC)
+```
+
+```{r}
+
+kable(EVOL_DOC_MAT_TA,booktabs=T,row.names = FALSE,
+           caption = "Evolución de docentes de aula municipales vs matrícula municipal",
+           align = c("l",rep("c",ncol(EVOL_DOC_MAT_TA)-1)),
+      format.args = list(big.mark=".")) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(0,color = "white",background = "#FF3300") %>%
+  add_footnote(paste("Fuente: Cargos docentes ",anioM,", Datos abiertos Mineduc.",sep = ""), notation = "none") %>% 
+  add_footnote("Nota: Se consideran establecimientos en funcionamiento y con matrícula.", notation = "none")
+
+```
+
+```{r funcion para re-escalar variables para graficar, include=FALSE}
+
+calc_fudge_axis = function(y1, y2) {
+  
+  ylim1 <- range(y1, na.rm = TRUE)
+  ylim2 <- range(y2, na.rm = TRUE)
+  
+  mult <- (ylim1[2] - ylim1[1]) / (ylim2[2] - ylim2[1])
+  miny1 <- ylim1[1]
+  miny2 <- ylim2[1]
+  
+  cast_to_y1 = function(x) {
+    (mult * (x - miny2)) + miny1
+  }
+  
+  yf <- cast_to_y1(y2)
+
+  labelsyf <- pretty(y2)
+  return(
+    list(
+      yf = yf,
+      labels = labelsyf,
+      breaks = cast_to_y1(labelsyf),
+      zero = cast_to_y1(0)
+  ))
+}
+
+rescaledVals <- calc_fudge_axis(EVOL_DOC_MAT$`Matrícula Municipal/Público`, y2 = EVOL_DOC_MAT$N_DOC)
+
+# check if the ranges are equal
+#range(rescaledVals$yf, na.rm = TRUE) == range(EVOL_DOC_MAT$`Matrícula Municipal/Público`, na.rm = TRUE)
+
+EVOL_DOC_MAT_G <- EVOL_DOC_MAT %>% mutate(N_DOC_RE = rescaledVals$yf)
+
+```
+
+```{r ,fig.cap= "Evolución de docentes de aula municipales vs matrícula municipal ", fig.align='center'}
+
+ggplot(EVOL_DOC_MAT_G) + 
+  geom_line(aes(x = AGNO, y = `Matrícula Municipal/Público`)) +
+  geom_line(aes(x = AGNO, y = N_DOC_RE), color = "red") +
+  geom_point(aes(x = AGNO, y = `Matrícula Municipal/Público`)) +
+  geom_point(aes(x = AGNO, y = N_DOC_RE), color = "red") +
+  labs(x="Años",caption = "Fuente: Bases de Cargos Docentes, Datos Abiertos Mineduc")+
+  scale_y_continuous(
+    sec.axis = dup_axis(breaks = rescaledVals$breaks, labels = rescaledVals$labels, name = "Docentes de Aula"))+
+  theme(axis.title.y = element_text(color = "black"),
+        axis.text.y = element_text(color = "black"),
+        axis.title.y.right = element_text(color = "red"),
+        axis.text.y.right = element_text(color = "red"))
+
+```
+**Nota:** Se consideran establecimientos funcionando con matrícula.
+
+```{r Cursos habilitados, include=FALSE}
+
+# Auxiliar
+anio_i = anioM - 9
+lista <- c()
+k= 1
+
+while (anio_i <= anioM){
+  # Abrir archivos
+  lista[[k]] <- read_delim(paste(ruta_m,"/Resumen_Matrcula_EE_",anio_i,"_oficial.csv",sep = ""),delim = ";") %>% 
+    rename_with(toupper)
+  # Filtrar por EE funcionando para aquellas bases que tengan esta variable
+  try(lista[[k]] <- lista[[k]] %>% filter(ESTADO_ESTAB==1))
+  # Cambiar nombre de variable anio para holomogar
+  try(names(lista[[k]])[1] <- "AGNO")
+  # Cambiar nombre de variable Curso combinado total para holomogar
+  try(names(lista[[k]])[names(lista[[k]]) == "CUR_COM_TOT"] <- "CUR_COMB_TOT")
+  # Crear variable sLEP
+  lista[[k]] <- lista[[k]] %>% mutate(SLEP=cod_SLEP(COD_COM_RBD)) %>%
+    # Filtrar por EE publicos y por SLEP
+    filter(COD_DEPE %in% c(1,2,6),SLEP == nombre_SLEP[i]) %>% 
+    # Seleccioanr variables de interes
+    select(AGNO,CUR_SIM_TOT,CUR_COMB_TOT)
+  
+  anio_i = anio_i + 1
+  k= k + 1
+}
+
+CURSOS <- bind_rows(lista) %>% group_by(AGNO) %>% 
+  summarise(CUR_TOT = sum(CUR_SIM_TOT,CUR_COMB_TOT))
+
+EVOL_DOC_AULA <- EVOL_DOC %>% filter(TIPO_DOC == "Docentes de aula") %>%
+  select(AGNO,N_DOC)
+
+EVOL_DOC_CURSO <- merge(CURSOS,EVOL_DOC_AULA,by="AGNO")
+
+# Re-escalar valores para graficar
+rescaledVals <- calc_fudge_axis(EVOL_DOC_CURSO$N_DOC, y2 = EVOL_DOC_CURSO$CUR_TOT)
+
+EVOL_DOC_CURSO_G <- EVOL_DOC_CURSO %>% mutate(CUR_TOT_RE = rescaledVals$yf)
+
+EVOL_DOC_CURSO_TA <- EVOL_DOC_CURSO %>% arrange(desc(AGNO)) %>%
+  mutate(AGNO = as.character(AGNO)) %>%
+  rename("Año" =AGNO, "Docentes de aula"=N_DOC, "Cursos habilitados" = CUR_TOT)
+
+```
+
+```{r}
+
+kable(EVOL_DOC_CURSO_TA,booktabs=T,row.names = FALSE,
+           caption = "Evolución de docentes de aula municipales vs cursos habilitados",
+           align = c("l",rep("c",ncol(EVOL_DOC_CURSO_TA)-1)),
+      format.args = list(big.mark=".")) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(0,color = "white",background = "#FF3300") %>%
+  add_footnote(paste("Fuente: Cargos docentes ",anioM,", Datos abiertos Mineduc.",sep = ""), notation = "none") %>% 
+  add_footnote("Nota: Se consideran establecimientos en funcionamiento y con matrícula.", notation = "none")
+
+```
+
+```{r ,fig.cap= "Evolución de docentes de aula municipales vs cursos habilitados", fig.align='center'}
+
+ggplot(EVOL_DOC_CURSO_G) + 
+  geom_line(aes(x = AGNO, y = N_DOC)) +
+  geom_line(aes(x = AGNO, y = CUR_TOT_RE), color = "red") +
+  geom_point(aes(x = AGNO, y = N_DOC)) +
+  geom_point(aes(x = AGNO, y = CUR_TOT_RE), color = "red") +
+  labs(x="Años",y="Docentes de aula",caption = "Fuente: Bases de Cargos Docentes, Datos Abiertos Mineduc")+
+  scale_y_continuous(
+    sec.axis = dup_axis(breaks = rescaledVals$breaks, labels = rescaledVals$labels, name = "Cursos habilitados"))+
+  theme(axis.title.y = element_text(color = "black"),
+        axis.text.y = element_text(color = "black"),
+        axis.title.y.right = element_text(color = "red"),
+        axis.text.y.right = element_text(color = "red"))
+
+```
+
+```{r Docentes por tipo de contrato, include=FALSE}
+
+EVOL_DOC_CONTR <- DOCENTES %>% filter(COD_DEPE %in% c(1,2,6)) %>%
+  mutate("Tipo de Contrato"=case_when(
+    ID_ITC == 1 ~ "Titular",
+    ID_ITC == 2 ~ "Contratado",
+    ID_ITC == 3 ~ "Reemplazante",
+    ID_ITC == 8 ~ "Contrato a Honorarios",
+    ID_ITC %in% c(9,10,11,12) ~ "Contrato SEP",
+    ID_ITC %in% c(13,14,15,20) ~ "Contrato PIE")) %>%
+  group_by(AGNO,`Tipo de Contrato`) %>% 
+  summarize(N_DOC = n())
+
+EVOL_DOC_CONTR_Tabla <- spread(EVOL_DOC_CONTR,key = "AGNO",value = "N_DOC", fill = 0) %>% 
+  adorn_totals(name="Total",where = c("row"))
+
+EVOL_DOC_CONTR <- EVOL_DOC_CONTR %>% group_by(AGNO) %>% 
+  mutate(TOTAL = sum(N_DOC), "Porcentaje docentes" =round((N_DOC / TOTAL)*100,2)) %>%
+  select(-c(TOTAL,N_DOC)) %>% 
+  spread(key = "AGNO",value = "Porcentaje docentes", fill = 0) %>% 
+  adorn_totals(name="Total",where = c("row"))
+
+```
+
+```{r}
+
+kable(EVOL_DOC_CONTR_Tabla,booktabs=T,row.names = FALSE,
+           caption = "Evolución de docentes municipales por tipo de contrato",
+           align = c("l",rep("c",ncol(EVOL_DOC_CONTR_Tabla)-1)),
+      format.args = list(big.mark=".")) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(0,color = "white",background = "#FF3300") %>%
+  row_spec(nrow(EVOL_DOC_CONTR_Tabla),bold = T) %>%
+  add_footnote(paste("Fuente: Cargos docentes ",anioDOC,", Datos abiertos Mineduc.",sep = ""), notation = "none") %>% 
+  add_footnote("Nota: Se consideran establecimientos en funcionamiento y con matrícula.", notation = "none")
+
+```
+
+```{r}
+
+kable(EVOL_DOC_CONTR,booktabs=T,row.names = FALSE,
+           caption = "Evolución en porcentaje de docentes municipales por tipo de contrato",
+           align = c("l",rep("c",ncol(EVOL_DOC_CONTR)-1)),
+      format.args = list(big.mark=".")) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(0,color = "white",background = "#FF3300") %>%
+  row_spec(nrow(EVOL_DOC_CONTR),bold = T) %>%
+  add_footnote(paste("Fuente: Cargos docentes ",anioDOC,", Datos abiertos Mineduc.",sep = ""), notation = "none") %>% 
+  add_footnote("Nota: Se consideran establecimientos en funcionamiento y con matrícula.", notation = "none")
+
+```
+
+```{r Docentes por horas de contrato, include=FALSE}
+
+EVOL_DOC_HORAS <- DOCENTES %>% filter(COD_DEPE %in% c(1,2,6)) %>%
+  mutate("Horas de Contrato"=case_when(
+    HORAS_CONTRATO >= 44 ~ "44 horas",
+    HORAS_CONTRATO < 44 & HORAS_CONTRATO >= 33  ~ "Entre 33 y 44 horas",
+    HORAS_CONTRATO < 33 & HORAS_CONTRATO >= 22 ~ "Entre 22 y 32 horas",
+    HORAS_CONTRATO < 22 ~ "Menos de 22 horas")) %>%
+  group_by(AGNO,`Horas de Contrato`) %>% 
+  summarize(N_DOC = n())
+
+EVOL_DOC_HORAS_Tabla <- spread(EVOL_DOC_HORAS,key = "AGNO",value = "N_DOC", fill = 0) %>% 
+  adorn_totals(name="Total",where = c("row"))
+
+EVOL_DOC_HORAS <- EVOL_DOC_HORAS %>% group_by(AGNO) %>% 
+  mutate(TOTAL = sum(N_DOC), "Porcentaje docentes" =round((N_DOC / TOTAL)*100,2)) %>%
+  select(-c(TOTAL,N_DOC)) %>% 
+  spread(key = "AGNO",value = "Porcentaje docentes", fill = 0) %>% 
+  adorn_totals(name="Total",where = c("row"))
+
+```
+
+```{r}
+
+kable(EVOL_DOC_HORAS_Tabla,booktabs=T,row.names = FALSE,
+           caption = "Evolución de docentes municipales por horas de contrato",
+           align = c("l",rep("c",ncol(EVOL_DOC_HORAS_Tabla)-1)),
+      format.args = list(big.mark=".")) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(0,color = "white",background = "#FF3300") %>%
+  row_spec(nrow(EVOL_DOC_HORAS_Tabla),bold = T) %>%
+  add_footnote(paste("Fuente: Cargos docentes ",anioDOC,", Datos abiertos Mineduc.",sep = ""), notation = "none") %>% 
+  add_footnote("Nota: Se consideran establecimientos en funcionamiento y con matrícula.", notation = "none")
+
+```
+
+```{r}
+
+kable(EVOL_DOC_HORAS,booktabs=T,row.names = FALSE,
+           caption = "Evolución en porcentaje de docentes municipales por horas de contrato",
+           align = c("l",rep("c",ncol(EVOL_DOC_HORAS)-1)),
+      format.args = list(big.mark=".")) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(0,color = "white",background = "#FF3300") %>%
+  row_spec(nrow(EVOL_DOC_HORAS),bold = T) %>%
+  add_footnote(paste("Fuente: Cargos docentes ",anioDOC,", Datos abiertos Mineduc.",sep = ""), notation = "none") %>% 
+  add_footnote("Nota: Se consideran establecimientos en funcionamiento y con matrícula.", notation = "none")
+
+```
+
+```{r Carrera Docente, include=FALSE}
+
+#------------------------------------------------------------------------------#
+rutaDOC <- "D:/OneDrive - Dirección de Educación Pública/DEP/Basedatos/Docentes/MRUN/privadas"
+
+DOCENTES_CARRERA <- read_delim(paste(rutaDOC,"/Docentes_",anioDOC,".csv",sep = ""),delim = ";")
+
+#------------------------------------------------------------------------------#
+
+DOCENTES_CARRERA <- DOCENTES_CARRERA %>% mutate(SLEP = cod_SLEP(COD_COM_RBD)) %>% 
+  filter(SLEP == nombre_SLEP[i], COD_DEPE %in% c(1,2,6), ESTADO_ESTAB == 1) %>% 
+  distinct(MRUN, .keep_all = T) %>% 
+  group_by(TRAMO_CARR_DOCENTE) %>% 
+  summarize(N_DOC = n())
+
+DOCENTES_CARRERA <- spread(DOCENTES_CARRERA,key = "TRAMO_CARR_DOCENTE", value = "N_DOC",fill = 0) %>% 
+  rename("Sin Información" = `0`, "Acceso" = `1`,"Inicial" = `2`,
+         "Temprano" = `3`, "Avanzado" = `4`, "Experto I" = `5`, "Experto II" = `6`) %>% 
+  adorn_totals(name="Total","col")
+
+```
+
+```{r}
+
+kable(DOCENTES_CARRERA,booktabs=T,row.names = FALSE,
+           caption = paste("Docentes municipales por Tramo de Carrera Docente, ",anioDOC,sep = ""),
+           align = c("l",rep("c",ncol(DOCENTES_CARRERA)-1)),
+      format.args = list(big.mark=".")) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(0,color = "white",background = "#FF3300") %>%
+  column_spec(ncol(DOCENTES_CARRERA),bold = T) %>% 
+  add_footnote(paste("Fuente: Cargos docentes ",anioDOC,", Datos abiertos Mineduc.",sep = ""), notation = "none") %>% 
+  add_footnote("Nota: Se consideran establecimientos en funcionamiento y con matrícula.", notation = "none")
+
+```
+
+* **Acceso**:	Tramo provisorio donde se ubican los profesores que tienen 4 o más años de experiencia profesional, pero no cuentan con resultados vigentes en instrumentos de evaluación del Ministerio de Educación.
+
+* **Inicial**: Es la etapa de inmersión en el ejercicio profesional.
+
+* **Temprano**:	Es la etapa de avance hacia la consolidación de las competencias profesionales, donde la enseñanza que se realiza evidencia un mayor desarrollo en todos sus aspectos.
+
+* **Avanzado**:	El docente consolida su identidad profesional, logrando un nivel esperado de los saberes y competencias profesionales, de acuerdo con los criterios señalados en el Marco para la Buena Enseñanza.
+
+* **Experto I**: Tramo voluntario que da cuenta de un docente que cuenta con experiencia, competencias pedagógicas y conocimientos disciplinarios por sobre lo esperado para un buen ejercicio profesional docente.
+
+* **Experto II**: Tramo voluntario y más alto de la Carrera Docente, que refiere a un profesor con experiencia, competencias pedagógicas y conocimientos disciplinarios de excelencia para el ejercicio profesional docente.
+
+## Asistentes de la Educación en el territorio
+
+La definición de Asistentes de la Educación según el Artículo 2° de la Ley N° 21.109 Estatuto de los Asistentes de la Educación Pública corresponde a: _“**Son asistentes de la educación**, para efectos de esta ley, los funcionarios que, desempeñándose en uno o más establecimientos educacionales dependientes de los Servicios Locales de Educación Pública, sin perjuicio de su forma de financiamiento, incluidos aquellos establecimientos de educación parvularia financiados vía transferencia de fondos, colaboren en el desarrollo del proceso de enseñanza y aprendizaje de los estudiantes y la correcta prestación del servicio educacional, a través de funciones de carácter profesional”, además, “Se considerará asimismo asistente de la educación al personal que cumpla funciones en internados escolares que dependan de los servicios locales.”_
+
+
+```{r Asistentes, include=FALSE}
+#------------------------------------------------------------------------------#
+# Anio de la ultima base de docentes disponible
+anioASIS <- 2021
+# Ruta del archivo
+ruta <-"D:/OneDrive - Dirección de Educación Pública/DEP/Basedatos/Asistentes/MRUN"
+
+#------------------------------------------------------------------------------#
+
+#auxiliar
+anio_i = anioASIS - 9
+lista <- c()
+k = 1
+
+while(anio_i <= anioASIS){
+
+lista[[k]] <- read_delim(paste(ruta,"/Asistentes_",anio_i,".csv",sep = ""),delim = ";") %>%
+  rename_with(toupper)
+
+names(lista[[k]])[1] <- "AGNO"
+
+try(lista[[k]] <- lista[[k]] %>% filter(ESTADO_ESTAB==1))
+try(lista[[k]] <- lista[[k]] %>% rename(COD_COM_RBD = COM_COD))
+
+# Renombrar variable clave si el año es menor a 2015 (no existe la variable MRUN en bases anteriores a 2016)
+#if (anio_i <= 2015){lista[[k]] <- lista[[k]] %>% rename(MRUN = CLAVE)}
+
+lista[[k]] <- lista[[k]] %>% mutate(SLEP = cod_SLEP(COD_COM_RBD)) %>%
+  filter(SLEP == nombre_SLEP[i])
+  
+try(lista[[k]] <- lista[[k]] %>% select(AGNO,MRUN,COD_COM_RBD,ID_F1,COD_DEPE,ID_ITC,HORAS_CONTRATO,ID_ESTAMENTO))  
+try(lista[[k]] <- lista[[k]] %>% select(AGNO,CLAVE,COD_COM_RBD,ID_F1,COD_DEPE,ID_ITC,HORAS_CONTRATO,ID_ESTAMENTO))
+
+anio_i = anio_i + 1
+k = k + 1
+
+}
+
+ASISTENTES <- bind_rows(lista)
+
+ASISTENTES <- merge(ASISTENTES,COM_SLEP,by.x = "COD_COM_RBD", by.y= "COD_COM") %>%
+  rename(Comuna = NOM_COM) %>% select(-COD_COM_RBD)
+
+```
+
+```{r Asistentes por comuna, include=FALSE}
+
+ASISTENTES_COMUNAS <- ASISTENTES %>% filter(AGNO == anioASIS) %>% group_by(Comuna,COD_DEPE) %>%
+  summarize(Asistentes = n()) %>% 
+  mutate(COD_DEPE = case_when(COD_DEPE %in% c(1,2,6) ~ "Municipal/Público",
+  COD_DEPE == 3 ~ "Particular Subvencionado",
+  COD_DEPE == 4 ~ "Particular Pagado",
+  COD_DEPE == 5 ~ "Administración Delegada"))
+
+ASISTENTES_COMUNAS <- spread(ASISTENTES_COMUNAS, key = "COD_DEPE", value="Asistentes",fill = 0) %>% 
+  adorn_totals(where = c("row","col"))
+
+```
+
+```{r}
+
+kable(ASISTENTES_COMUNAS,booktabs=T,row.names = FALSE,
+           caption = paste("Número de asistentes, ",anioASIS,sep = ""),
+           align = c("l",rep("c",ncol(ASISTENTES_COMUNAS)-1)),
+      format.args = list(big.mark=".")) %>%
+  kable_styling(full_width = T) %>%
+  row_spec(0,color = "white",background = "#FF3300") %>%
+  column_spec(ncol(ASISTENTES_COMUNAS),bold = T) %>% 
+  add_footnote(paste("Fuente: base asistentes ",anioASIS,", Datos abiertos Mineduc.",sep = ""), notation = "none") %>% 
+  add_footnote("Nota: Se consideran establecimientos en funcionamiento y con matrícula.", notation = "none")
+
+```
