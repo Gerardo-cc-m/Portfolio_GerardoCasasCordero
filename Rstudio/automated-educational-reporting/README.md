@@ -14,3 +14,5 @@ generate educational reports using open public data.
 - Academic performance metrics
 - Teacher allocation ratios
 - Territorial context indicators
+
+![Page 1](screenshots/1.indice.png)  
