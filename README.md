@@ -17,25 +17,25 @@ Background in Rstudio, Python, Power BI, Power Query, Excel, and SAP data extrac
 - **ETL Pipeline – ERP to Data Repository**  
   Simulated end-to-end ETL process replicating data extraction from an ERP system, transformation using Python, and loading into structured datasets for reporting.
   
-  - Repository: https://github.com/Gerardo-cc-m/etl-erp-python
+  - Repository: [ETL with Python](https://github.com/Gerardo-cc-m/etl-erp-python)
   
 - **Automated Commercial Reporting**  
   Python-based automation for generating and distributing reports via e-mail.
 
-  - Repository: https://github.com/Gerardo-cc-m/etl-erp-python/tree/main/Automated_Reporting
+  - Repository:  [Automated Commercial Reporting](https://github.com/Gerardo-cc-m/etl-erp-python/tree/main/Automated_Reporting)  
 
 ### 🔹 Rstudio automation  
 
 - **Automated Educational Reporting**  
   Rstudio-bases automation for generating reports with educational insights and territorial caractheristics.
   
-  - Repository: https://github.com/Gerardo-cc-m/Portfolio_GerardoCasasCordero/tree/main/Rstudio/automated-educational-reporting
+  - Repository: [Rstudio automated report](https://github.com/Gerardo-cc-m/Portfolio_GerardoCasasCordero/tree/main/Rstudio/automated-educational-reporting)  
 
 ### 🔹 Power BI Dashboards
 - **Commercial Performance Dashboard**  
   Interactive dashboard to monitor commercial KPIs.
   
-  - Repository: [https://github.com/Gerardo-cc-m/Portfolio_GerardoCasasCordero/powerbi/commercial-performance-dashboard](https://github.com/Gerardo-cc-m/Portfolio_GerardoCasasCordero/tree/main/powerbi/commercial-performance-dashboard)  
+  - Repository: [Commercial Dashboard Power BI](https://github.com/Gerardo-cc-m/Portfolio_GerardoCasasCordero/tree/main/powerbi/commercial-performance-dashboard)  
 
 ### 🔹 Excel & VBA
 - **KPI Tracker & Management Dashboard**  
