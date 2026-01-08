@@ -22,6 +22,8 @@ Background in Rstudio, Python, Power BI, Power Query, Excel, and SAP data extrac
 - **Automated Commercial Reporting**  
   Python-based automation for generating and distributing reports via e-mail.
 
+  - Repository: https://github.com/Gerardo-cc-m/etl-erp-python/tree/main/Automated_Reporting
+
 ### 🔹 Rstudio automation  
 
 - **Automated Educational Reporting**  
